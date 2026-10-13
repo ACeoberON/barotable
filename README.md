@@ -7,7 +7,7 @@
 
 ## 팀
 - 최우진, 지윤석, 이승훈
-- 초기 코드: https://github.com/YSji0421/barotable-pagetest에서 시작
+- 초기 코드: [YSji0421/barotable-pagetest](https://github.com/YSji0421/barotable-pagetest)에서 시작
 
 ## 기술 스택 (예정)
 Spring Boot, Thymeleaf, MySQL, JPA, Ollama(로컬 LLM)
