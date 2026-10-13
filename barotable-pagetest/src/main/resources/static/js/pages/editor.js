@@ -22,8 +22,13 @@
   };
   const FX_NAME = { window: '창문', wall: '벽', entrance: '입구', kitchen: '주방', restroom: '화장실', stairs: '계단' };
   const SHAPES = [['round', '원형'], ['rect', '사각'], ['bar', '바'], ['room', '룸']];
-  /* 예약이 걸린 테이블은 지우거나 번호를 바꿀 수 없다 (예약이 가리키는 자리가 사라지므로) */
-  const BOOKED = new Set(BT.reservations().filter(r => r.status === 'booked').map(r => r.table));
+  /* 예약이 걸렸거나 지금 손님이 앉아 있는 테이블은 지우거나 번호를 바꿀 수 없다 (예약이 가리키는 자리가 사라지므로)
+   * - 방문 예정(booked): 오늘 이후 예약
+   * - 방문 완료(visited): 오늘, 기준 시각이 이용 시간(dineMinutes) 안에 있을 때 (워크인 포함) */
+  const DINE = BT.store().dineMinutes;
+  const holds = r => r.status === 'booked' ? r.date >= BT.TODAY
+    : r.status === 'visited' && r.date === BT.TODAY && BT.toMin(BT.NOW) < BT.toMin(r.time) + DINE;
+  const BOOKED = new Set(BT.reservations().filter(holds).map(r => r.table));
 
   const floor = () => FL.find(f => f.id === S.floor);
   const snap = v => Math.round(v / GRID) * GRID;
@@ -193,7 +198,7 @@
   function removeSel() {
     const o = selObj(); if (!o) return;
     const f = floor(), k = S.sel.k;
-    if (k === 'table' && BOOKED.has(o.id)) { BT.toast(`${o.id}에는 예약이 있어 지울 수 없어요`); return; }
+    if (k === 'table' && BOOKED.has(o.id)) { BT.toast(`${o.id}에는 예약이나 이용 중인 손님이 있어 지울 수 없어요`); return; }
     if (k === 'zone') f.zones = f.zones.filter(x => x !== o);
     else if (k === 'table') f.tables = f.tables.filter(x => x !== o);
     else f.fixtures = f.fixtures.filter(x => x !== o);
@@ -263,7 +268,7 @@
       const t = o, z = f.zones.find(x => x.id === t.zone), locked = BOOKED.has(t.id);
       p.innerHTML = `<div class="row" style="justify-content:space-between"><h2 style="font-size:16px">테이블 속성</h2><span class="badge badge-indigo">${BT.esc(f.name)} · ${BT.esc(z ? z.name : '구역 밖')}</span></div>
         <div class="field"><label for="p-id">테이블 번호</label><input class="input mono" id="p-id" value="${BT.esc(t.id)}" maxlength="5" ${locked ? 'readonly' : ''}>
-          ${locked ? '<span class="hint">예약이 걸려 있어 번호를 바꾸거나 지울 수 없어요.</span>' : '<span class="hint" id="p-id-msg"></span>'}</div>
+          ${locked ? '<span class="hint">예약이 있거나 손님이 이용 중이라 번호를 바꾸거나 지울 수 없어요.</span>' : '<span class="hint" id="p-id-msg"></span>'}</div>
         <div class="form-row">
           <div class="field"><label for="p-seats">좌석 수</label><input class="input" type="number" id="p-seats" min="1" max="20" value="${t.seats}"></div>
           <div class="field"><label for="p-shape">모양</label><select class="select" id="p-shape">${SHAPES.map(([v, l]) => `<option value="${v}" ${t.shape === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
@@ -282,7 +287,7 @@
       $('#p-tags').addEventListener('input', e => { t.tags = e.target.value.split(',').map(s => s.trim()).filter(Boolean); touch(); });
       $('#p-comb').addEventListener('change', e => { t.combinable = e.target.checked; touch(); });
       bindCommon(t, 'table');
-      if (locked) { $('#p-del').disabled = true; $('#p-del').title = '예약이 걸린 테이블'; }
+      if (locked) { $('#p-del').disabled = true; $('#p-del').title = '예약 또는 이용 중인 테이블'; }
       return;
     }
     const x = o;
