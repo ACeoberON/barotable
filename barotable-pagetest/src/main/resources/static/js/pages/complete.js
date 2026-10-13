@@ -3,7 +3,6 @@
   const d = BT.draft(), t = BT.findTable(d.table) || BT.findTable('T03'), z = BT.zoneOf(t);
   const no = BT.guestNo(d);
   document.querySelector('#d-no').textContent = no;
-  document.querySelector('#lk-no').value = no;
   document.querySelector('#d-info').innerHTML = `
     <dt>매장</dt><dd>${BT.esc(BT.store().name)}</dd>
     <dt>일시</dt><dd>${BT.fmtDate(d.date, 'long')} ${d.time}</dd>
@@ -15,8 +14,6 @@
   const n1 = document.querySelector('#n-confirm'), n2 = document.querySelector('#n-daybefore');
   if (n1) n1.hidden = !nt.confirm;
   if (n2) n2.hidden = !nt.dayBefore;
-  /* 조회 화면으로 입력값을 넘겨 바로 조회되게 한다 */
-  document.querySelector('a.btn[data-go="lookup"]').addEventListener('click', () => {
-    BT.sset('bt.lookup', { no: document.querySelector('#lk-no').value, phone: document.querySelector('#lk-phone').value });
-  });
+  /* 메일 속 조회 링크와 같은 주소 (시연용 버튼) */
+  document.querySelector('#lk-open').setAttribute('href', BT.lookupUrl(no));
 })();

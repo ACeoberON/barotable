@@ -74,6 +74,25 @@ window.BT = (function () {
   function resetReservations() { try { sessionStorage.removeItem('bt.res'); } catch (e) {} }
   const isActive = r => r.status !== 'noshow' && r.status !== 'cancelled';
 
+  /* ---------- 예약 조회 링크 (C-07) ----------
+   * 예약 완료 메일에 조회 링크(lookup?t=토큰)를 넣고, 링크만으로 예약을 보여 준다.
+   * 프로토타입은 예약번호로 토큰을 흉내 내서 만든다 (같은 예약이면 늘 같은 값).
+   * 실제 구현: 예약 저장 때 SecureRandom 128비트 이상 무작위 값을 만들어 예약.조회토큰(UK)에 저장,
+   *            토큰_만료일시 = 방문일 다음 날 0시. 조회 전용이며 다른 용도로 쓰지 않는다. */
+  function tokenOf(no) {
+    const ABC = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let h = 2166136261, out = '';
+    for (let i = 0; i < 22; i++) {
+      for (const c of no + ':' + i) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+      out += ABC[h % ABC.length];
+    }
+    return out;
+  }
+  const byToken = t => (t ? reservations().find(r => tokenOf(r.no) === t) : null) || null;
+  /* 방문일이 지나면 만료 (방문 당일까지 유효) */
+  const tokenExpired = r => r.date < TODAY;
+  const lookupUrl = no => url('lookup') + '?t=' + tokenOf(no);
+
   /* ---------- 좌석 규칙 (손님 추천 · 워크인 · 테이블 이동 공통) ----------
    * 좌석 수와 구역 인원 조건 위반이면 이유 문자열, 괜찮으면 null */
   function seatRule(t, party, fl) {
@@ -176,7 +195,7 @@ window.BT = (function () {
     if (/[?&]debug\b/.test(location.search)) showDebug();
     /* 발표용 화면 구성도 패널 (static/js/screen-map.js) */
     const sm = document.createElement('script');
-    sm.src = document.body.dataset.server === 'true' ? '/js/screen-map.js?v=20261006d' : '../'.repeat(Number(document.body.dataset.depth || 0) + 1) + 'static/js/screen-map.js?v=20261006d';
+    sm.src = document.body.dataset.server === 'true' ? '/js/screen-map.js?v=20261013a' : '../'.repeat(Number(document.body.dataset.depth || 0) + 1) + 'static/js/screen-map.js?v=20261013a';
     document.body.appendChild(sm);
     /* 매장 입장 화면의 영업시간 표시도 운영 조건을 따른다 */
     const ho = document.getElementById('h-open'), hb = document.getElementById('h-break'), h = store().hours;
@@ -190,5 +209,5 @@ window.BT = (function () {
   });
 
   return { YEAR, MONTH, TODAY, NOW, store, saveStore, resetStore, floors, allTables, findTable, zoneOf, url, go, draft, saveDraft,
-    guestNo, reservations, updateReservation, addReservation, removeReservation, resetReservations, isActive, seatRule, tableClash, sget, sset, pad, toMin, toHHMM, parseDate, iso, fmtDate, octoberDays, slots, timeCheck, esc, toast };
+    guestNo, reservations, updateReservation, addReservation, removeReservation, resetReservations, isActive, tokenOf, byToken, tokenExpired, lookupUrl, seatRule, tableClash, sget, sset, pad, toMin, toHHMM, parseDate, iso, fmtDate, octoberDays, slots, timeCheck, esc, toast };
 })();
