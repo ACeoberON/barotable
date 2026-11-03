@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>바로테이블 · DB 연결 확인</title>
+  <style>
+    :root { --bg:#F7F8FA; --surface:#fff; --line:#E1E7EE; --ink:#26374A; --muted:#66788A; --soft:#ECF2F7;
+            --ok:#1F7A5A; --ok-bg:#E3F3EC; --no:#A23B2F; --no-bg:#F8E6E3; }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:"Noto Sans KR","Malgun Gothic",system-ui,sans-serif; font-size:15px; line-height:1.55 }
+    header { background:var(--ink); color:#fff; padding:18px 28px; display:flex; gap:16px; align-items:center; flex-wrap:wrap }
+    header h1 { margin:0; font-size:20px }
+    header .sub { color:#D7E0EB; font-size:13px }
+    header a { margin-left:auto; color:#fff; font-size:13px; border:1px solid #6b7f95; border-radius:8px; padding:6px 12px; text-decoration:none }
+    nav { position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid var(--line); padding:10px 28px; display:flex; gap:8px; flex-wrap:wrap }
+    nav a { font-size:13px; color:var(--ink); text-decoration:none; background:var(--soft); border-radius:999px; padding:5px 12px }
+    main { max-width:1180px; margin:0 auto; padding:22px 20px 60px; display:grid; gap:18px }
+    section { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px 22px; scroll-margin-top:60px }
+    h2 { margin:0 0 4px; font-size:18px }
+    .step { display:inline-block; background:var(--ink); color:#fff; border-radius:6px; font-size:12px; padding:1px 8px; margin-right:6px; vertical-align:2px }
+    .what { color:var(--muted); font-size:13.5px; margin:0 0 14px }
+    .what code, td code { background:var(--soft); border-radius:4px; padding:0 5px; font-size:12.5px }
+    table { width:100%; border-collapse:collapse; font-size:14px }
+    th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top }
+    th { background:var(--soft); font-weight:700; font-size:13px }
+    .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px }
+    .kv { display:grid; grid-template-columns:130px 1fr; gap:6px 12px; font-size:14px }
+    .kv dt { color:var(--muted) } .kv dd { margin:0; font-weight:600 }
+    .pill { display:inline-block; border-radius:999px; padding:1px 9px; font-size:12px; font-weight:700 }
+    .ok { background:var(--ok-bg); color:var(--ok) } .no { background:var(--no-bg); color:var(--no) } .mut { background:var(--soft); color:var(--muted) }
+    .big { font-size:26px; font-weight:800 }
+    form.row { display:flex; gap:8px; flex-wrap:wrap; align-items:end; margin:6px 0 4px }
+    label { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted) }
+    input, select { font:inherit; font-size:14px; padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink) }
+    button { font:inherit; font-size:14px; font-weight:700; padding:8px 14px; border-radius:8px; border:0; background:var(--ink); color:#fff; cursor:pointer }
+    button.ghost { background:#fff; color:var(--ink); border:1px solid var(--line) }
+    button.warn { background:var(--no) }
+    .msg { margin:10px 0 0; padding:9px 12px; border-radius:8px; font-weight:700 }
+    .flow { display:flex; gap:6px; flex-wrap:wrap; font-size:13px; margin:4px 0 12px }
+    .flow span { background:var(--soft); border-radius:6px; padding:3px 8px }
+    .flow b { color:var(--muted); font-weight:400 }
+  </style>
+</head>
+<body>
+<header>
+  <h1>DB 연결 확인</h1>
+  <span class="sub">Spring Boot + JPA + MySQL · ERD v2 테이블 9개를 실제 DB에서 읽고 씁니다</span>
+  <a href="/">← 서비스 화면으로</a>
+</header>
+<nav>
+  <a href="#conn">① 연결</a><a href="#counts">② 테이블 9개</a><a href="#store">③ 매장·운영조건</a>
+  <a href="#floors">④ 좌석도</a><a href="#reservations">⑤ 예약 조회·저장</a><a href="#overlap">⑥ 겹침 검사</a>
+  <a href="#race">⑦ 동시 예약</a><a href="#member">⑧ 회원·비회원</a>
+</nav>
+<main>
+
+  <section id="conn">
+    <h2><span class="step">①</span>DB 연결</h2>
+    <p class="what">서버가 켜질 때 <code>application.yml</code>의 주소로 MySQL에 연결하고, <code>schema.sql</code>로 테이블을, <code>data.sql</code>로 시험 데이터를 넣습니다. JPA는 <code>ddl-auto: validate</code>로 엔티티와 테이블이 맞는지 검사합니다. 이 화면이 열렸다는 것 자체가 검사 통과입니다.</p>
+    <dl class="kv">
+      <dt>상태</dt><dd><span class="pill ok">연결됨</span></dd>
+      <dt>DB</dt><dd th:text="${conn.product + ' ' + conn.version}">MySQL 8.0</dd>
+      <dt>데이터베이스</dt><dd th:text="${conn.database}">barotable</dd>
+      <dt>JDBC 주소</dt><dd><code th:text="${conn.url}">jdbc:mysql://localhost:3306/barotable</code></dd>
+    </dl>
+  </section>
+
+  <section id="counts">
+    <h2><span class="step">②</span>테이블 9개와 행 수</h2>
+    <p class="what">ERD v2의 테이블 9개마다 JPA 엔티티 클래스가 하나씩 있습니다. 아래 숫자는 각 엔티티의 <code>Repository.count()</code>로 DB에서 바로 센 값입니다.</p>
+    <table>
+      <tr><th>ERD 이름</th><th>DB 테이블</th><th>JPA 엔티티</th><th style="text-align:right">행 수</th></tr>
+      <tr th:each="c : ${counts}">
+        <td th:text="${c.korean}">계정</td><td><code th:text="${c.table}">account</code></td>
+        <td><code th:text="${c.entity}">Account</code></td><td style="text-align:right;font-weight:700" th:text="${c.rows}">4</td>
+      </tr>
+    </table>
+  </section>
+
+  <div class="grid2">
+    <section id="store">
+      <h2><span class="step">③</span>매장과 운영조건 (1:1)</h2>
+      <p class="what"><code>store</code>와 <code>store_rule</code>. 운영조건은 매장_ID를 PK로 그대로 써서(<code>@MapsId</code>) 매장마다 하나만 있습니다.</p>
+      <dl class="kv">
+        <dt>매장</dt><dd th:text="${store.name}">바로키친 성수점</dd>
+        <dt>주소</dt><dd th:text="${store.address}"></dd>
+        <dt>점주 계정</dt><dd th:text="${store.owner}"></dd>
+        <dt>영업시간</dt><dd th:text="${store.hours}"></dd>
+        <dt>브레이크</dt><dd th:text="${store.breakTime}"></dd>
+        <dt>예약 인원</dt><dd th:text="${store.party}"></dd>
+        <dt>이용시간</dt><dd th:text="${store.dineMinutes + '분 (예약 종료 = 시작 + 이용시간)'}"></dd>
+        <dt>시간대 한도</dt><dd th:text="${store.slotLimit}"></dd>
+        <dt>좌석 직접 선택</dt><dd th:text="${store.seatChoice ? '켜짐' : '꺼짐 (추천 자리로 자동 배정)'}"></dd>
+        <dt>AI 해석 방식</dt><dd th:text="${store.aiMode}"></dd>
+      </dl>
+    </section>
+
+    <section id="floors">
+      <h2><span class="step">④</span>좌석도: 층 → 테이블</h2>
+      <p class="what"><code>floor</code> 아래 <code>dining_table</code>. 구역 밖 테이블은 구역이 비어 있을 수 있어서 테이블이 층을 직접 가집니다.</p>
+      <div th:each="f : ${floors}" style="margin-bottom:12px">
+        <b th:text="${f.name}">1층</b>
+        <span class="pill mut" th:text="${'테이블 ' + f.tables.size() + '개 · 시설물 ' + f.facilities + '개'}"></span>
+        <table style="margin-top:6px">
+          <tr><th>번호</th><th>좌석</th><th>구역</th><th>사용</th></tr>
+          <tr th:each="t : ${f.tables}">
+            <td th:text="${t.no}">T01</td><td th:text="${t.seats}">2</td><td th:text="${t.zone}">창가</td>
+            <td><span th:class="${t.active} ? 'pill ok' : 'pill no'" th:text="${t.active} ? '사용' : '숨김'"></span></td>
+          </tr>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <section id="reservations">
+    <h2><span class="step">⑤</span>예약 조회와 저장</h2>
+    <p class="what">점주 화면처럼 "우리 매장의 그날 예약"을 <code>findByStoreIdAndVisitDate</code>로 읽습니다(예약.매장_ID 덕분에 조인 없이 조회). 아래에서 예약을 저장하면 실제 <code>reservation</code> 테이블에 들어가고 목록에 바로 보입니다.</p>
+    <form class="row" method="get" action="/dev/db">
+      <label>날짜<input type="date" name="date" th:value="${date}"></label>
+      <button class="ghost" type="submit">조회</button>
+    </form>
+    <table style="margin-top:8px">
+      <tr><th>예약번호</th><th>시간</th><th>테이블</th><th>인원</th><th>예약자</th><th>구분</th><th>경로</th><th>상태</th></tr>
+      <tr th:if="${reservations.isEmpty()}"><td colspan="8" style="color:var(--muted)">이 날짜에는 예약이 없습니다</td></tr>
+      <tr th:each="r : ${reservations}">
+        <td><code th:text="${r.no}"></code></td><td th:text="${r.time}"></td><td th:text="${r.table}"></td>
+        <td th:text="${r.party}"></td><td th:text="${r.name}"></td><td th:text="${r.who}"></td><td th:text="${r.channel}"></td>
+        <td><span class="pill mut" th:text="${r.status}"></span> <span class="pill ok" th:if="${r.seated}">착석 기록 있음</span></td>
+      </tr>
+    </table>
+    <form class="row" method="post" action="/dev/db/book" style="margin-top:14px">
+      <label>테이블<select name="tableId">
+        <optgroup th:each="f : ${floors}" th:label="${f.name}">
+          <option th:each="t : ${f.tables}" th:value="${t.id}" th:text="${t.no + ' (' + t.seats + '인)'}" th:selected="${t.no == 'T03'}"></option>
+        </optgroup></select></label>
+      <label>날짜<input type="date" name="date" th:value="${date}"></label>
+      <label>시작<input type="time" name="start" value="19:00" step="1800"></label>
+      <label>인원<input type="number" name="party" value="2" min="1" max="8" style="width:70px"></label>
+      <label>예약자<input type="text" name="name" value="시연 손님" style="width:110px"></label>
+      <button type="submit">예약 저장</button>
+    </form>
+    <p class="msg" th:if="${bookMsg}" th:classappend="${#strings.startsWith(bookMsg,'저장')} ? 'ok' : 'no'" th:text="${bookMsg}"></p>
+  </section>
+
+  <section id="overlap">
+    <h2><span class="step">⑥</span>겹침 검사</h2>
+    <p class="what">같은 테이블·같은 날·확정 또는 방문 상태 예약 중 <b>기존 시작 &lt; 새 종료 그리고 새 시작 &lt; 기존 종료</b>이면 겹칩니다. 예: 10월 10일 T09는 19:00–20:30 예약이 있어서 19:30은 겹치고, 20:30은 겹치지 않습니다.</p>
+    <form class="row" method="post" action="/dev/db/overlap">
+      <label>테이블<select name="tableId">
+        <optgroup th:each="f : ${floors}" th:label="${f.name}">
+          <option th:each="t : ${f.tables}" th:value="${t.id}" th:text="${t.no}" th:selected="${t.no == 'T09'}"></option>
+        </optgroup></select></label>
+      <label>날짜<input type="date" name="date" th:value="${date}"></label>
+      <label>시작<input type="time" name="start" value="19:30" step="1800"></label>
+      <button type="submit">겹침 확인</button>
+    </form>
+    <p class="msg" th:if="${overlapMsg}" th:classappend="${#strings.contains(overlapMsg,'0건')} ? 'ok' : 'no'" th:text="${overlapMsg}"></p>
+  </section>
+
+  <section id="race">
+    <h2><span class="step">⑦</span>두 손님이 같은 자리를 동시에 예약하면</h2>
+    <p class="what">손님 A와 B가 0.3초 차이로 같은 테이블·같은 시간을 예약합니다. A는 확인 후 저장 전에 2초 머뭅니다(느린 상황 재현). 누를 때마다 같은 자리의 이전 시연 예약은 지우고 새로 시작하므로, 두 버튼을 번갈아 눌러 비교할 수 있습니다.</p>
+    <div class="flow"><span>① 트랜잭션 시작</span><b>→</b><span>② 테이블 행 잠금 (SELECT … FOR UPDATE)</span><b>→</b><span>③ 겹침 다시 확인</span><b>→</b><span>④ 저장</span><b>→</b><span>⑤ 커밋 (잠금 풀림)</span></div>
+    <form class="row" method="post" action="/dev/db/race">
+      <label>테이블<select name="tableId">
+        <optgroup th:each="f : ${floors}" th:label="${f.name}">
+          <option th:each="t : ${f.tables}" th:value="${t.id}" th:text="${t.no}" th:selected="${t.no == 'T03'}"></option>
+        </optgroup></select></label>
+      <label>날짜<input type="date" name="date" th:value="${date}"></label>
+      <label>시작<input type="time" name="start" value="21:00" step="1800"></label>
+      <button type="submit" name="lock" value="true">잠금 켜고 동시 예약</button>
+      <button type="submit" name="lock" value="false" class="warn">잠금 끄고 동시 예약</button>
+    </form>
+    <div th:if="${race}" style="margin-top:12px">
+      <p style="margin:0 0 6px;font-weight:700" th:text="${raceLock} ? '결과: 잠금 켬' : '결과: 잠금 끔'"></p>
+      <table>
+        <tr><th>손님</th><th>요청 시각</th><th>응답 시각</th><th>걸린 시간</th><th>결과</th></tr>
+        <tr th:each="l : ${race}">
+          <td th:text="${l.who}"></td><td><code th:text="${l.requested}"></code></td><td><code th:text="${l.answered}"></code></td>
+          <td th:text="${l.waited}"></td>
+          <td><span th:class="${l.ok} ? 'pill ok' : 'pill no'" th:text="${l.result}"></span></td>
+        </tr>
+      </table>
+      <p class="msg ok" th:if="${raceLock}">B는 A가 커밋할 때까지 기다렸다가 다시 확인해서 겹침을 발견하고 거절됐습니다. 같은 자리에 예약은 1건만 남습니다.</p>
+      <p class="msg no" th:unless="${raceLock}">잠금이 없으면 B가 확인하는 순간 A가 아직 저장 전이라 둘 다 "겹침 0건"으로 보고 둘 다 저장됩니다. ⑤ 목록에서 같은 자리 중복을 확인한 뒤 아래 초기화를 누르세요.</p>
+    </div>
+    <form method="post" action="/dev/db/reset" style="margin-top:12px">
+      <input type="hidden" name="date" th:value="${date}">
+      <button class="ghost" type="submit">시연 데이터 초기화 (DEMO- 예약만 삭제)</button>
+    </form>
+    <p class="msg ok" th:if="${resetMsg}" th:text="${resetMsg}"></p>
+  </section>
+
+  <section id="member">
+    <h2><span class="step">⑧</span>회원과 비회원 조회</h2>
+    <p class="what">회원 예약은 <code>account_id</code>가 있어서 계정으로, 비회원 예약은 <code>account_id</code>가 비어 있고 메일 링크의 <code>lookup_token</code>으로 찾습니다.</p>
+    <div class="grid2">
+      <div>
+        <b>회원 #4 (김민지)의 "내 예약"</b>
+        <table style="margin-top:6px">
+          <tr><th>예약번호</th><th>일시</th><th>테이블</th><th>상태</th></tr>
+          <tr th:each="r : ${member}"><td><code th:text="${r.no}"></code></td><td th:text="${r.time}"></td><td th:text="${r.table}"></td><td th:text="${r.status}"></td></tr>
+        </table>
+      </div>
+      <div>
+        <b>비회원 조회 토큰</b>
+        <form class="row" method="get" action="/dev/db">
+          <input type="hidden" name="date" th:value="${date}">
+          <label>토큰<input type="text" name="token" th:value="${token}" style="width:230px"></label>
+          <button class="ghost" type="submit">조회</button>
+        </form>
+        <p class="msg ok" th:if="${tokenResult}" th:text="${tokenResult.no + ' · ' + tokenResult.name + ' · ' + tokenResult.time + ' · ' + tokenResult.table}"></p>
+        <p class="msg no" th:unless="${tokenResult}">해당 토큰의 예약이 없습니다</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
