@@ -31,3 +31,32 @@ GitHub Pages가 파일을 약 10분 캐시해서, 안 바꾸면 휴대폰에서 
 ## 화면
 C-01 매장 입장 · C-03 좌석도 선택 · C-04/05 정보 확인 · C-06 예약 완료 · C-07 비회원 조회 ·
 A-01 점주·관리자 로그인 · A-02 서비스 관리자 · O-02 대시보드 · O-03 좌석도 편집 · O-04 운영 조건 · O-05 손님 배정
+
+## 서버로 실행하기 (Spring Boot + MySQL)
+
+10주차부터 이 폴더는 Spring Boot 프로젝트이기도 합니다. 위의 정적 미리보기(GitHub Pages)는 그대로 동작합니다.
+
+- Java 21, Spring Boot 3.5, Gradle, MySQL 8.0
+- DB 구조(ERD v2, 테이블 9개): `src/main/resources/db/schema.sql`, 시험 데이터: `db/data.sql`
+  - 서버가 켜질 때 DB `barotable`과 테이블을 만들고(이미 있으면 그대로), 시험 데이터를 넣습니다(이미 있으면 건너뜀).
+  - JPA는 `ddl-auto: validate`로 엔티티와 테이블이 맞는지만 검사합니다.
+
+### 처음 한 번
+1. MySQL 8.0을 켭니다.
+2. `src/main/resources/application-local.yml.example`을 복사해 `application-local.yml`로 이름을 바꾸고 MySQL 비밀번호를 적습니다. (Git에 올라가지 않습니다)
+
+### 실행
+- 테스트: `./gradlew test` (Windows는 `gradlew.bat test`) → MySQL에 연결해 9개 테스트
+- 서버: `./gradlew bootRun` → http://localhost:8080
+- DB 연결 확인 화면: http://localhost:8080/dev/db (테이블 9개 행 수, 매장·좌석도·예약 조회, 예약 저장, 겹침 검사, 동시 예약 잠금 시연). 서비스 관리자 화면 왼쪽 "바로가기"에도 링크가 있습니다.
+- GitHub Pages에서는 서버가 없어서 같은 링크가 `templates/dev/db-snapshot.html`(실제 MySQL 실행 기록)로 열립니다.
+
+### 패키지
+| 패키지 | 테이블 |
+|---|---|
+| `account` | account (계정) |
+| `store` | store (매장), store_rule (운영조건) |
+| `layout` | floor (층), zone (구역), dining_table (테이블), facility (시설물) |
+| `reservation` | reservation (예약), table_use (테이블이용), 예약 저장 서비스 |
+| `web` | 화면 주소 → 템플릿 연결 |
+| `devcheck` | DB 연결 확인 화면 (/dev/db) |

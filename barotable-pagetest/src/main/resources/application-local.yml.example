@@ -1,0 +1,6 @@
+# 이 파일을 복사해서 이름을 application-local.yml 로 바꾸고, 내 PC의 MySQL 비밀번호를 적는다.
+# application-local.yml 은 .gitignore 에 있어서 Git에 올라가지 않는다.
+spring:
+  datasource:
+    username: root
+    password: 여기에_MySQL_비밀번호

@@ -1,5 +1,5 @@
 /* C-03 좌석도 선택
- * 구현: 10월 날짜 선택, 영업시간 안 30분 단위 시간 선택(브레이크 제외), 층 탭 · 구역 필터, AI 채팅 조건 적용
+ * 구현: 10월 날짜 선택, 영업시간 안 30분 단위 시간 선택(브레이크 제외), 층 탭 · 구역 필터, 예약 조건 적용
  * 운영 조건(BT.store())의 영업시간 · 인원 범위 · 이용 시간 · 자리 직접 고르기 허용 여부를 따른다.
  * 휴대폰: 좌석도 크게 보기(전체 화면, 뒤로가기로 닫힘)와 화면 아래 고정 바로 스크롤을 줄인다.
  * 막힌 자리: 고른 날짜·시간과 이용 시간(dineMinutes)이 겹치는 예약이 있는 테이블.
@@ -14,7 +14,18 @@
   const days = BT.octoberDays();
   const st = BT.store(), DINE = st.dineMinutes;
   /* 매장 전체 예약. 지금 고르고 있는 내 예약(임시 저장분)은 내 자리를 막지 않도록 뺀다 */
-  const bookings = () => { const mine = BT.guestNo(BT.draft()); return BT.reservations().filter(r => r.no !== mine); };
+  const bookings = () => {
+    const mine = BT.guestNo(BT.draft());
+    // 화면 시연을 위한 예시 예약 상태. 실제 서비스에서는 서버 예약 목록으로 대체해야 합니다.
+    // 달력에서 다른 달로 넘어가도 보이도록, 고른 날짜(오늘 이후)마다 3건씩 만든다.
+    const iso = S.date, odd = Number(String(iso).slice(8, 10)) % 2;
+    const samples = iso >= BT.TODAY ? [
+      { no: 'DEMO-' + iso + '-A', date: iso, time: '18:00', table: 'T03', status: 'booked' },
+      { no: 'DEMO-' + iso + '-B', date: iso, time: '19:00', table: 'T07', status: 'booked' },
+      { no: 'DEMO-' + iso + '-C', date: iso, time: '19:30', table: odd ? 'T01' : 'T05', status: 'booked' }
+    ] : [];
+    return BT.reservations().filter(r => r.no !== mine).concat(samples);
+  };
   const isPast = time => S.date === BT.TODAY && BT.toMin(time) <= BT.toMin(BT.NOW);
 
   /* ---------- 규칙 엔진 ----------
@@ -26,6 +37,8 @@
     if (isPast(S.time)) return `${BT.NOW} 이전 시간은 예약할 수 없어요`;
     const tc = BT.timeCheck(S.time);
     if (!tc.ok) return tc.reason;
+    // 2인 예약은 단체석·대형 룸을 선택할 수 없도록 시각적으로 비활성화합니다.
+    if (party <= 2 && (t.seats >= 6 || (t.tags || []).includes('단체') || t.shape === 'room')) return '단체석은 3명 이상부터 이용할 수 있어요';
     const c = clash(t);
     if (c) return `${c.time}에 예약이 있어 ${BT.toHHMM(BT.toMin(c.time) + DINE)}까지 쓸 수 없어요`;
     return BT.seatRule(t, party, fl);
@@ -37,7 +50,7 @@
     if (next) { S.time = next.time; return true; }
     return false;
   }
-  /* 채팅 요청(ai-chat.js의 prefs)과 테이블이 몇 개나 맞는지 */
+  /* 추가 요청 조건과 테이블이 몇 개나 맞는지 */
   function prefScore(t) {
     return S.prefs.filter(p => p === '룸' ? t.shape === 'room' : /^\d층$/.test(p) ? t.floorName === p : t.tags.includes(p)).length;
   }
@@ -49,45 +62,87 @@
     return t && { t, matched: best > 0 };
   }
 
-  const S = { date: d0.date, time: d0.time, party: Math.min(st.maxParty, Math.max(st.minParty, d0.party)), floor: fl[0].id, zone: 'all', selected: null, request: '', prefs: [] };
+  const initialDate = /^\d{4}-\d{2}-\d{2}$/.test(d0.date || '') && d0.date >= BT.TODAY ? d0.date : (days.find(x => !x.past) || days[0]).iso;
+  const S = { date: initialDate, time: d0.time, party: Math.min(st.maxParty, Math.max(st.minParty, d0.party)), floor: fl[0].id, zone: 'all', selected: null, request: '', prefs: [] };
+  const todayYear = Number(BT.TODAY.slice(0, 4)), todayMonth = Number(BT.TODAY.slice(5, 7));
+  let viewYear = Number(S.date.slice(0, 4)), viewMonth = Number(S.date.slice(5, 7));
 
-  /* ---------- 날짜: 10월 ---------- */
+  /* ---------- 달력 + 가로 스크롤 인원/시간 (한 장의 바텀시트) ---------- */
+  function sheetSummary() {
+    const d = $('#sheet-current-date'), p = $('#sheet-current-party');
+    if (d) d.textContent = BT.fmtDate(S.date, 'long');
+    if (p) p.textContent = `${S.party}명 · ${S.time || '시간 미선택'}`;
+    const confirm = $('#sheet-confirm');
+    if (confirm) confirm.disabled = !S.time || isPast(S.time) || !BT.timeCheck(S.time).ok || !BT.slots().some(x => x.time === S.time && !x.break);
+  }
   function renderDates() {
     const box = $('#date-strip');
-    box.innerHTML = days.map(x => `
-      <button type="button" role="option" class="date-chip ${x.dow === 0 ? 'sun' : ''} ${x.dow === 6 ? 'sat' : ''} ${x.today ? 'today' : ''} ${x.iso === S.date ? 'on' : ''}"
-        data-date="${x.iso}" ${x.past ? 'disabled' : ''} aria-selected="${x.iso === S.date}" aria-label="10월 ${x.day}일 ${x.week}요일">
-        <span class="w">${x.today ? '오늘' : x.week}</span><span class="d">${x.day}</span>
-      </button>`).join('');
-    box.querySelectorAll('.date-chip:not([disabled])').forEach(b => b.addEventListener('click', () => { S.date = b.dataset.date; if (fixTime()) BT.toast(`오늘은 ${BT.NOW} 이후만 예약돼요. ${S.time}로 바꿨어요`); renderDates(); renderTimes(); renderMap(); renderPanel(); }));
-    const on = box.querySelector('.on');
-    if (on) box.scrollLeft = Math.max(0, on.offsetLeft - box.offsetLeft - 60);
+    const first = new Date(viewYear, viewMonth - 1, 1);
+    const offset = first.getDay();
+    const count = new Date(viewYear, viewMonth, 0).getDate();
+    const label = $('#calendar-month-label');
+    if (label) label.textContent = `${viewYear}년 ${viewMonth}월`;
+    const prev = $('#calendar-prev');
+    if (prev) prev.disabled = viewYear < todayYear || (viewYear === todayYear && viewMonth <= todayMonth);
+    const currentDays = Array.from({length: count}, (_, i) => {
+      const day = i + 1, date = new Date(viewYear, viewMonth - 1, day);
+      const iso = `${viewYear}-${BT.pad(viewMonth)}-${BT.pad(day)}`;
+      return {iso, day, dow: date.getDay(), week: ['일','월','화','수','목','금','토'][date.getDay()], past: iso < BT.TODAY, today: iso === BT.TODAY};
+    });
+    box.innerHTML = Array.from({length: offset}, () => '<span class="calendar-empty" aria-hidden="true"></span>').join('') + currentDays.map(x => `
+      <button type="button" class="calendar-day ${x.dow === 0 ? 'sun' : ''} ${x.dow === 6 ? 'sat' : ''} ${x.iso === S.date ? 'on' : ''}"
+       data-date="${x.iso}" ${x.past ? 'disabled' : ''} aria-pressed="${x.iso === S.date}" aria-label="${viewMonth}월 ${x.day}일 ${x.week}요일${x.past ? ', 지난 날짜' : ''}">
+       <span>${x.day}</span>${x.today ? '<small>오늘</small>' : ''}</button>`).join('');
+    box.querySelectorAll('button:not([disabled])').forEach(b => b.addEventListener('click', () => {
+      S.date = b.dataset.date;
+      viewYear = Number(S.date.slice(0, 4)); viewMonth = Number(S.date.slice(5, 7));
+      fixTime(); S.selected = null; renderDates(); renderTimes(); renderMap(); renderPanel(); sheetSummary();
+    }));
+    sheetSummary();
   }
-  /* ---------- 시간: 운영 조건의 영업시간, 브레이크는 선택 불가 ---------- */
+  function shiftCalendarMonth(delta) {
+    const next = new Date(viewYear, viewMonth - 1 + delta, 1);
+    const targetYear = next.getFullYear(), targetMonth = next.getMonth() + 1;
+    if (delta < 0 && (targetYear < todayYear || (targetYear === todayYear && targetMonth < todayMonth))) return;
+    viewYear = targetYear; viewMonth = targetMonth; renderDates();
+  }
+  $('#calendar-prev').addEventListener('click', () => shiftCalendarMonth(-1));
+  $('#calendar-next').addEventListener('click', () => shiftCalendarMonth(1));
+    function renderParty() {
+    const ps = $('#party-strip');
+    ps.innerHTML = Array.from({length:st.maxParty-st.minParty+1}, (_,i)=>i+st.minParty).map(p=>
+      `<button class="sheet-choice ${p===S.party?'on':''}" type="button" data-party="${p}" aria-pressed="${p===S.party}">${p}명</button>`).join('');
+    ps.querySelectorAll('[data-party]').forEach(b=>b.addEventListener('click',()=>{
+      S.party=Number(b.dataset.party); S.selected=null;renderParty();renderMap();renderPanel();sheetSummary();
+    }));
+    const pv = $('#p-val'); if(pv) pv.textContent = S.party+'명';
+    const ph=$('#p-hint'); if(ph) ph.textContent = `${st.minParty}–${st.maxParty}명`;
+    const rb=$('#req-badge'); if(rb){rb.hidden=!S.request;rb.textContent=S.request?S.request:'';}
+  }
+  $('#p-minus').addEventListener('click',()=>{S.party=Math.max(st.minParty,S.party-1);renderParty();renderMap();renderPanel();});
+  $('#p-plus').addEventListener('click',()=>{S.party=Math.min(st.maxParty,S.party+1);renderParty();renderMap();renderPanel();});
   function renderTimes() {
-    const sl = BT.slots(), h = BT.store().hours;
-    const g = p => sl.filter(x => x.period === p);
-    const chip = x => `<button type="button" class="chip ${x.time === S.time ? 'on' : ''}" data-time="${x.time}" ${x.break ? 'disabled title="브레이크 타임"' : isPast(x.time) ? 'disabled title="지난 시간"' : ''} aria-pressed="${x.time === S.time}">${x.time}</button>`;
-    const lunch = g('lunch'), brk = g('break'), dinner = g('dinner');
-    const range = a => a.length ? `${a[0].time}–${a[a.length - 1].time}` : '';
-    const hs = $('#hours-small'); if (hs) hs.textContent = `${h.open}–${h.close}`;
-    $('#time-groups').innerHTML =
-      (lunch.length ? `<div class="time-group"><div class="time-group-label"><b>점심</b>${range(lunch)}</div><div class="chips">${lunch.map(chip).join('')}</div></div>` : '') +
-      (brk.length ? `<div class="time-group"><div class="time-group-label"><b>브레이크</b>예약 불가</div><div class="chips">${brk.map(chip).join('')}<span class="break-note">${h.breakStart}–${h.breakEnd} 준비 시간</span></div></div>` : '') +
-      (dinner.length ? `<div class="time-group"><div class="time-group-label"><b>${lunch.length ? '저녁' : '예약 시간'}</b>${range(dinner)}</div><div class="chips">${dinner.map(chip).join('')}<span class="hint" style="align-self:center">${h.close} 영업 종료</span></div></div>` : '');
-    document.querySelectorAll('#time-groups .chip:not([disabled])').forEach(b => b.addEventListener('click', () => { S.time = b.dataset.time; renderTimes(); renderMap(); renderPanel(); }));
+    const sl=BT.slots().filter(x=>!x.break);
+    const h=BT.store().hours;
+    const label=$('#hours-small');if(label)label.textContent=`${h.open}–${h.close}`;
+    const groups=[['lunch','점심'],['dinner','저녁']];
+    $('#time-groups').innerHTML=groups.map(([key,name])=>{
+      const times=sl.filter(x=>x.period===key && !isPast(x.time));
+      if(!times.length || times.every(x=>isPast(x.time)))return '';
+      return `<div class="sheet-time-group"><div class="sheet-time-name"><span>${name}</span><small>${times[0].time}–${times[times.length-1].time}</small></div>
+        <div class="sheet-horizontal sheet-time-scroll" role="group" aria-label="${name} 시간대">${times.map(x=>{
+           const disabled=isPast(x.time);
+           return `<button class="sheet-choice sheet-time-choice ${x.time===S.time?'active':''}" type="button" data-time="${x.time}" ${disabled?'disabled':''} aria-pressed="${x.time===S.time}" aria-label="${name} ${x.time}${disabled?' 지난 시간':''}">${x.time}</button>`;
+        }).join('')}</div></div>`;
+    }).join('');
+    $('#time-groups').querySelectorAll('button[data-time]:not([disabled])').forEach(b=>b.addEventListener('click',()=>{
+      S.time=b.dataset.time; S.selected=null;
+      const v=BT.timeCheck(S.time);
+      if(!v.ok){BT.toast(v.reason);return;}
+      renderTimes();renderMap();renderPanel();sheetSummary();
+      // 시간 선택은 미리보기만 바꿉니다. 하단의 확인 버튼을 눌러야 이동합니다.
+    }));
   }
-  /* ---------- 인원 ---------- */
-  function renderParty() {
-    $('#p-val').textContent = S.party + '명';
-    $('#p-minus').disabled = S.party <= st.minParty;
-    $('#p-plus').disabled = S.party >= st.maxParty;
-    const ph = $('#p-hint'); if (ph) ph.textContent = `${st.minParty}–${st.maxParty}명 · 그 이상은 매장으로 문의`;
-    const rb = $('#req-badge'); rb.hidden = !S.request; rb.textContent = S.request ? '요청사항 · ' + S.request : '';
-  }
-  $('#p-minus').addEventListener('click', () => { S.party--; renderParty(); renderMap(); renderPanel(); });
-  $('#p-plus').addEventListener('click', () => { S.party++; renderParty(); renderMap(); renderPanel(); });
-
   /* ---------- 층 / 구역 ---------- */
   function renderFloors() {
     $('#floor-tabs').innerHTML = fl.map(f => `<button type="button" role="tab" class="tab ${f.id === S.floor ? 'on' : ''}" data-floor="${f.id}" aria-selected="${f.id === S.floor}">${BT.esc(f.name)}</button>`).join('');
@@ -109,10 +164,16 @@
       selected: S.selected,
       recommended: S.selected ? null : ((recommend(S.party) || {}).t || {}).id,
       zoneFilter: S.zone,
-      statusOf: t => clash(t) ? { cls: 'reserved', sub: '예약됨' } : { cls: 'available' },
+      statusOf: t => {
+        if (clash(t)) return { cls: 'reserved', sub: '예약 완료', title: '이미 예약된 자리' };
+        const reason = violation(t, S.party);
+        if (reason) return { cls: 'small', sub: '인원 불가', title: reason };
+        return { cls: 'available', sub: '예약 가능', title: '선택 가능' };
+      },
       onSelect: t => {
-        if (!st.allowSeatChoice) { BT.toast('이 매장은 자리를 자동으로 배정해요. 오른쪽 추천 자리로 예약됩니다'); return; }
-        if (clash(t)) return;
+        if (!st.allowSeatChoice) { BT.toast('이 매장은 자리를 자동으로 배정해요. 추천 자리로 예약됩니다'); return; }
+        const bad = violation(t, S.party);
+        if (bad) { BT.toast(bad); return; }
         S.selected = S.selected === t.id ? null : t.id;
         renderMap(); renderPanel();
       }
@@ -127,7 +188,7 @@
   function goNext(t) {
     // 저장 직전 재검사: 화면 상태와 상관없이 코드로 한 번 더 확인
     if (!t || violation(t, S.party)) { renderMap(); renderPanel(); return; }
-    BT.saveDraft({ date: S.date, time: S.time, party: S.party, table: t.id, request: S.request });
+    BT.saveDraft({ date: S.date, time: S.time, party: S.party, table: t.id, request: S.request, confirmed:false });
     BT.go('confirm');
   }
   function recInfo() {
@@ -156,12 +217,12 @@
       const z = BT.zoneOf(t, fl), bad = violation(t, S.party);
       p.innerHTML = `<span class="badge badge-solid" style="align-self:flex-start">현재 선택</span>
         <div><div class="sel-id">${t.id}</div><p style="margin-top:6px;font-weight:700">${t.seats}인 테이블</p></div>
-        <dl class="kv">
+        <details class="booking-detail"><summary>테이블 상세 정보 보기</summary><dl class="kv">
           <dt>위치</dt><dd>${BT.esc(t.floorName)} · ${BT.esc(z ? z.name : '-')}</dd>
           <dt>특징</dt><dd><div class="tags">${t.tags.map(x => `<span class="badge badge-gray">${BT.esc(x)}</span>`).join('')}</div></dd>
           <dt>예약 조건</dt><dd>${cond}</dd>
           ${S.request ? `<dt>요청사항</dt><dd>${BT.esc(S.request)}</dd>` : ''}
-        </dl>
+        </dl></details>
         ${bad ? `<div class="notice bad">${BT.esc(bad)}</div>` : ''}
         <button class="btn btn-primary btn-block" id="go-next" ${bad ? 'disabled' : ''}>이 테이블 선택</button>`;
       $('#go-next').addEventListener('click', () => goNext(t));
@@ -295,20 +356,82 @@
       info = `<span class="badge badge-amber">추천</span><b>${rec.id}</b><small>${where(rec)}</small>`;
       act = '<button type="button" class="btn btn-soft btn-sm" data-sb="pick">추천 고르기</button>';
     } else info = '<small>앉을 수 있는 빈 테이블이 없어요</small>';
-    bar.innerHTML = `<div class="sb-info">${info}</div><button type="button" class="btn btn-ghost btn-sm" data-sb="full">좌석도 크게</button>${act}`;
+    bar.innerHTML = `<button type="button" class="btn btn-ghost btn-sm" data-sb="back" aria-label="방문 시간으로">←</button><div class="sb-info">${info}</div><button type="button" class="btn btn-ghost btn-sm" data-sb="full" aria-label="좌석도 크게 보기">확대</button>${act}`;
     const on = (k, fn) => { const b = bar.querySelector(`[data-sb="${k}"]`); if (b) b.addEventListener('click', fn); };
-    on('full', () => openFull()); on('next', () => goNext(t)); on('next-rec', () => goNext(rec)); on('pick', pickRec);
+    on('back', () => openSheet()); on('full', () => openFull()); on('next', () => goNext(t)); on('next-rec', () => goNext(rec)); on('pick', pickRec);
   }
 
   /* AI 채팅에서 확인한 조건 적용 */
   window.ReservePage = {
     apply(patch) {
       Object.assign(S, { date: patch.date, time: patch.time, party: patch.party, request: patch.request || '', prefs: patch.prefs || [], selected: null });
+      viewYear = Number(S.date.slice(0, 4)); viewMonth = Number(S.date.slice(5, 7));
       fixTime();
       renderDates(); renderTimes(); renderParty(); renderMap(); renderPanel();
+      closeSheet(true); setStage(2);
     }
   };
 
-  fixTime();
-  renderDates(); renderTimes(); renderParty(); renderFloors(); renderMap(); renderPanel();
+  /* 일정 선택 바텀시트. 날짜·인원·시간을 고른 뒤 확인 버튼으로 좌석도에 이동 */
+  const sheet = $('#booking-sheet'), overlay = $('#booking-overlay');
+  let stage = 1, prevFocus = null, sheetOriginal = null;
+  function openSheet() {
+    sheetOriginal = { ...S, prefs: [...S.prefs] };
+    prevFocus = document.activeElement;
+    sheet.hidden = overlay.hidden = false;
+    document.documentElement.classList.add('booking-sheet-lock');
+    renderDates();renderParty();renderTimes();sheetSummary();
+    sheet.focus({preventScroll:true});
+  }
+  function closeSheet(committed){
+    sheet.hidden=overlay.hidden=true;
+    document.documentElement.classList.remove('booking-sheet-lock');
+    // 확인하지 않고 닫은 수정 사항은 좌석도에 적용하지 않습니다.
+    if(committed !== true && sheetOriginal){
+      Object.assign(S, sheetOriginal);
+      viewYear = Number(S.date.slice(0, 4)); viewMonth = Number(S.date.slice(5, 7));
+      renderDates();renderParty();renderTimes();renderMap();renderPanel();
+    }
+    sheetOriginal=null;
+    if(prevFocus && prevFocus.isConnected && typeof prevFocus.focus==='function')prevFocus.focus({preventScroll:true});
+  }
+  $('#sheet-confirm').addEventListener('click',()=>{
+    const valid = S.time && !isPast(S.time) && BT.timeCheck(S.time).ok && BT.slots().some(x=>x.time===S.time&&!x.break);
+    if(!valid){BT.toast('예약 가능한 날짜와 시간을 선택해 주세요');return;}
+    S.selected=null;
+    BT.saveDraft({date:S.date,time:S.time,party:S.party,table:null,request:S.request,confirmed:false});
+    closeSheet(true);
+    setStage(2);
+    BT.toast('예약 가능한 테이블을 확인해 보세요');
+  });
+  function setStage(next){
+    stage=next===2?2:1;
+    $('#stage-store').hidden=stage===2;
+    $('#stage-seat').hidden=stage!==2;
+    document.querySelectorAll('#booking-steps [data-progress]').forEach(el=>{
+      const n=Number(el.dataset.progress);el.classList.toggle('on',n===stage);el.classList.toggle('done',n<stage);if(n===stage)el.setAttribute('aria-current','step');else el.removeAttribute('aria-current');
+    });
+    $('#seat-context').textContent=`${BT.fmtDate(S.date,'short')}   ·   ${S.time}   ·   ${S.party}명`;
+    bar.hidden=stage!==2;
+    document.body.classList.toggle('has-seat-bar',stage===2);
+    if(stage===2){renderFloors();renderMap();renderPanel();}
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+  $('#open-booking-sheet').addEventListener('click',openSheet);
+  $('#close-booking-sheet').addEventListener('click',closeSheet);
+  overlay.addEventListener('click',closeSheet);
+  $('#edit-visit').addEventListener('click',openSheet);
+  document.addEventListener('keydown',e=>{
+    if(sheet.hidden || FULL.open)return;
+    if(e.key==='Escape'){closeSheet();return;}
+    if(e.key==='Tab'){
+      const els=[...sheet.querySelectorAll('button:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el=>el.getClientRects().length);
+      if(!els.length)return;
+      if(e.shiftKey && document.activeElement===els[0]){e.preventDefault();els[els.length-1].focus();}
+      else if(!e.shiftKey && document.activeElement===els[els.length-1]){e.preventDefault();els[0].focus();}
+    }
+  });
+  fixTime();renderDates();renderTimes();renderParty();renderFloors();renderMap();renderPanel();
+  setStage(1);
+  openSheet();
 })();

@@ -1,7 +1,7 @@
 /* =========================================================
  * 테이블별 시간표 (점주 대시보드 · 손님 배정 공통)
  * v2 프로토타입의 "오늘 테이블 시간표"를 옮긴 것. 차이점:
- *  - 기준 시각은 실제 시계가 아니라 BT.NOW (하드코딩 19:00)
+ *  - 기준 시각은 BT.NOW (화면을 연 순간의 현재 시각)
  *  - 블록은 BT.reservations() 에서 만든다 (취소 · 노쇼는 빠짐)
  *  - 브레이크 타임을 회색 띠로 표시한다 (v2에는 없음)
  * ========================================================= */
@@ -18,20 +18,25 @@ window.Timetable = (function () {
    * @param opt   { tables, reservations, date, focus(tableId), soon(true면 30분 이내 강조), preview:{table,time,party}, onPick(reservation|null, table) }
    */
   function render(host, opt) {
-    const h = st().hours, open = BT.toMin(h.open), close = BT.toMin(h.close), span = close - open;
+    const h = st().hours, dayOpen = BT.toMin(h.open), dayClose = BT.toMin(h.close);
+    const open = opt.window ? Math.max(dayOpen,opt.window.start) : dayOpen;
+    const close = opt.window ? Math.min(dayClose,opt.window.end) : dayClose;
+    const span = Math.max(1,close-open);
     const now = BT.toMin(BT.NOW), dine = st().dineMinutes;
     const pos = m => ((Math.max(open, Math.min(close, m)) - open) / span * 100);
     const list = opt.reservations.filter(r => r.date === opt.date && BT.isActive(r));
 
     let ticks = '';
-    for (let m = open; m <= close; m += 30) {
+    const step = opt.compact ? 60 : 30;
+    for (let m = Math.ceil(open/step)*step; m <= close; m += step) {
       ticks += `<span class="tt-tick ${m % 60 ? 'half' : ''}" style="left:${pos(m)}%">${m % 60 ? '' : BT.toHHMM(m)}</span>`;
     }
-    const brk = `<span class="tt-break" style="left:${pos(BT.toMin(h.breakStart))}%;width:${pos(BT.toMin(h.breakEnd)) - pos(BT.toMin(h.breakStart))}%" aria-hidden="true"></span>`;
+    const breakStart=BT.toMin(h.breakStart), breakEnd=BT.toMin(h.breakEnd);
+    const brk = breakEnd > open && breakStart < close ? `<span class="tt-break" style="left:${pos(breakStart)}%;width:${pos(breakEnd) - pos(breakStart)}%" aria-hidden="true"></span>` : '';
 
     let prevFloor = null;
     const rows = opt.tables.map(t => {
-      const mine = list.filter(r => r.table === t.id);
+      const mine = list.filter(r => r.table === t.id && BT.toMin(r.time)<close && BT.toMin(r.time)+dine>open);
       const soon = opt.soon ? mine.filter(r => r.status === 'booked' && BT.toMin(r.time) >= now && BT.toMin(r.time) - now <= 30) : [];
       const blocks = mine.map(r => {
         const s = BT.toMin(r.time), k = kind(r), diff = s - now;
@@ -48,8 +53,8 @@ window.Timetable = (function () {
         <div class="tt-track">${brk}${blocks}${pv}</div></div>`;
     }).join('');
 
-    const nowIn = now >= open && now <= close;
-    host.innerHTML = `<div class="tt" style="--tt-now:${pos(now)}">
+    const nowIn = now >= open && now <= close && opt.showNow !== false;
+    host.innerHTML = `<div class="tt ${opt.compact ? 'tt-compact' : ''}" style="--tt-now:${pos(now)}">
       <div class="tt-head"><span class="tt-name-h">테이블</span><div class="tt-scale">${ticks}</div></div>
       <div class="tt-body">${rows}</div>
       ${nowIn ? `<div class="tt-now" aria-hidden="true"><span>${BT.NOW}</span></div>` : ''}

@@ -1,0 +1,437 @@
+<!DOCTYPE html><html lang="ko"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>바로테이블 · DB 연결 확인 (실행 기록)</title>
+  <style>
+    button[disabled],input[disabled],select[disabled]{opacity:.55;cursor:not-allowed}
+    :root { --bg:#F7F8FA; --surface:#fff; --line:#E1E7EE; --ink:#26374A; --muted:#66788A; --soft:#ECF2F7;
+            --ok:#1F7A5A; --ok-bg:#E3F3EC; --no:#A23B2F; --no-bg:#F8E6E3; }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:"Noto Sans KR","Malgun Gothic",system-ui,sans-serif; font-size:15px; line-height:1.55 }
+    header { background:var(--ink); color:#fff; padding:18px 28px; display:flex; gap:16px; align-items:center; flex-wrap:wrap }
+    header h1 { margin:0; font-size:20px }
+    header .sub { color:#D7E0EB; font-size:13px }
+    header a { margin-left:auto; color:#fff; font-size:13px; border:1px solid #6b7f95; border-radius:8px; padding:6px 12px; text-decoration:none }
+    nav { position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid var(--line); padding:10px 28px; display:flex; gap:8px; flex-wrap:wrap }
+    nav a { font-size:13px; color:var(--ink); text-decoration:none; background:var(--soft); border-radius:999px; padding:5px 12px }
+    main { max-width:1180px; margin:0 auto; padding:22px 20px 60px; display:grid; gap:18px }
+    section { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px 22px; scroll-margin-top:60px }
+    h2 { margin:0 0 4px; font-size:18px }
+    .step { display:inline-block; background:var(--ink); color:#fff; border-radius:6px; font-size:12px; padding:1px 8px; margin-right:6px; vertical-align:2px }
+    .what { color:var(--muted); font-size:13.5px; margin:0 0 14px }
+    .what code, td code { background:var(--soft); border-radius:4px; padding:0 5px; font-size:12.5px }
+    table { width:100%; border-collapse:collapse; font-size:14px }
+    th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top }
+    th { background:var(--soft); font-weight:700; font-size:13px }
+    .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px }
+    .kv { display:grid; grid-template-columns:130px 1fr; gap:6px 12px; font-size:14px }
+    .kv dt { color:var(--muted) } .kv dd { margin:0; font-weight:600 }
+    .pill { display:inline-block; border-radius:999px; padding:1px 9px; font-size:12px; font-weight:700 }
+    .ok { background:var(--ok-bg); color:var(--ok) } .no { background:var(--no-bg); color:var(--no) } .mut { background:var(--soft); color:var(--muted) }
+    .big { font-size:26px; font-weight:800 }
+    form.row { display:flex; gap:8px; flex-wrap:wrap; align-items:end; margin:6px 0 4px }
+    label { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted) }
+    input, select { font:inherit; font-size:14px; padding:7px 9px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink) }
+    button { font:inherit; font-size:14px; font-weight:700; padding:8px 14px; border-radius:8px; border:0; background:var(--ink); color:#fff; cursor:pointer }
+    button.ghost { background:#fff; color:var(--ink); border:1px solid var(--line) }
+    button.warn { background:var(--no) }
+    .msg { margin:10px 0 0; padding:9px 12px; border-radius:8px; font-weight:700 }
+    .flow { display:flex; gap:6px; flex-wrap:wrap; font-size:13px; margin:4px 0 12px }
+    .flow span { background:var(--soft); border-radius:6px; padding:3px 8px }
+    .flow b { color:var(--muted); font-weight:400 }
+  </style>
+</head>
+<body>
+<header>
+  <h1>DB 연결 확인</h1>
+  <span class="sub">Spring Boot + JPA + MySQL · ERD v2 테이블 9개를 실제 DB에서 읽고 씁니다</span>
+  <a href="../index.html">← 서비스 화면으로</a>
+</header>
+<nav>
+  <a href="#conn">① 연결</a><a href="#counts">② 테이블 9개</a><a href="#store">③ 매장·운영조건</a>
+  <a href="#floors">④ 좌석도</a><a href="#reservations">⑤ 예약 조회·저장</a><a href="#overlap">⑥ 겹침 검사</a>
+  <a href="#race">⑦ 동시 예약</a><a href="#member">⑧ 회원·비회원</a>
+</nav>
+<main><section style="background:#FFF6E0;border-color:#E9C46A"><h2 style="font-size:16px">이 화면은 실제 실행 기록입니다 (GitHub Pages용)</h2><p class="what" style="margin:0;color:#5b4a1a">2026-11-03 12:06에 Spring Boot 서버를 켜고 MySQL 8.0에 연결해 이 화면의 버튼을 직접 눌러 본 결과를 그대로 저장했습니다. GitHub Pages에는 서버와 DB가 없어서 버튼은 동작하지 않습니다. 실시간으로 확인하려면 서버를 실행한 뒤 <code>http://localhost:8080/dev/db</code>를 여세요.</p></section>
+
+  <section id="conn">
+    <h2><span class="step">①</span>DB 연결</h2>
+    <p class="what">서버가 켜질 때 <code>application.yml</code>의 주소로 MySQL에 연결하고, <code>schema.sql</code>로 테이블을, <code>data.sql</code>로 시험 데이터를 넣습니다. JPA는 <code>ddl-auto: validate</code>로 엔티티와 테이블이 맞는지 검사합니다. 이 화면이 열렸다는 것 자체가 검사 통과입니다.</p>
+    <dl class="kv">
+      <dt>상태</dt><dd><span class="pill ok">연결됨</span></dd>
+      <dt>DB</dt><dd>MySQL 8.0.46-0ubuntu0.24.04.4</dd>
+      <dt>데이터베이스</dt><dd>barotable</dd>
+      <dt>JDBC 주소</dt><dd><code>jdbc:mysql://localhost:3306/barotable</code></dd>
+    </dl>
+  </section>
+
+  <section id="counts">
+    <h2><span class="step">②</span>테이블 9개와 행 수</h2>
+    <p class="what">ERD v2의 테이블 9개마다 JPA 엔티티 클래스가 하나씩 있습니다. 아래 숫자는 각 엔티티의 <code>Repository.count()</code>로 DB에서 바로 센 값입니다.</p>
+    <table>
+      <tbody><tr><th>ERD 이름</th><th>DB 테이블</th><th>JPA 엔티티</th><th style="text-align:right">행 수</th></tr>
+      <tr>
+        <td>계정</td><td><code>account</code></td>
+        <td><code>Account</code></td><td style="text-align:right;font-weight:700">4</td>
+      </tr>
+      <tr>
+        <td>매장</td><td><code>store</code></td>
+        <td><code>Store</code></td><td style="text-align:right;font-weight:700">1</td>
+      </tr>
+      <tr>
+        <td>운영조건</td><td><code>store_rule</code></td>
+        <td><code>StoreRule</code></td><td style="text-align:right;font-weight:700">1</td>
+      </tr>
+      <tr>
+        <td>층</td><td><code>floor</code></td>
+        <td><code>Floor</code></td><td style="text-align:right;font-weight:700">2</td>
+      </tr>
+      <tr>
+        <td>구역</td><td><code>zone</code></td>
+        <td><code>Zone</code></td><td style="text-align:right;font-weight:700">6</td>
+      </tr>
+      <tr>
+        <td>테이블</td><td><code>dining_table</code></td>
+        <td><code>DiningTable</code></td><td style="text-align:right;font-weight:700">15</td>
+      </tr>
+      <tr>
+        <td>시설물</td><td><code>facility</code></td>
+        <td><code>Facility</code></td><td style="text-align:right;font-weight:700">6</td>
+      </tr>
+      <tr>
+        <td>예약</td><td><code>reservation</code></td>
+        <td><code>Reservation</code></td><td style="text-align:right;font-weight:700">5</td>
+      </tr>
+      <tr>
+        <td>테이블이용</td><td><code>table_use</code></td>
+        <td><code>TableUse</code></td><td style="text-align:right;font-weight:700">1</td>
+      </tr>
+    </tbody></table>
+  </section>
+
+  <div class="grid2">
+    <section id="store">
+      <h2><span class="step">③</span>매장과 운영조건 (1:1)</h2>
+      <p class="what"><code>store</code>와 <code>store_rule</code>. 운영조건은 매장_ID를 PK로 그대로 써서(<code>@MapsId</code>) 매장마다 하나만 있습니다.</p>
+      <dl class="kv">
+        <dt>매장</dt><dd>바로키친 성수점</dd>
+        <dt>주소</dt><dd>서울 성동구 성수이로 00, 1–2층</dd>
+        <dt>점주 계정</dt><dd>김점주 (owner@example.com)</dd>
+        <dt>영업시간</dt><dd>11:30 – 22:00</dd>
+        <dt>브레이크</dt><dd>15:00 – 17:00</dd>
+        <dt>예약 인원</dt><dd>1 – 8명</dd>
+        <dt>이용시간</dt><dd>90분 (예약 종료 = 시작 + 이용시간)</dd>
+        <dt>시간대 한도</dt><dd>8건</dd>
+        <dt>좌석 직접 선택</dt><dd>켜짐</dd>
+        <dt>AI 해석 방식</dt><dd>LOCAL</dd>
+      </dl>
+    </section>
+
+    <section id="floors">
+      <h2><span class="step">④</span>좌석도: 층 → 테이블</h2>
+      <p class="what"><code>floor</code> 아래 <code>dining_table</code>. 구역 밖 테이블은 구역이 비어 있을 수 있어서 테이블이 층을 직접 가집니다.</p>
+      <div style="margin-bottom:12px">
+        <b>1층</b>
+        <span class="pill mut">테이블 11개 · 시설물 5개</span>
+        <table style="margin-top:6px">
+          <tbody><tr><th>번호</th><th>좌석</th><th>구역</th><th>사용</th></tr>
+          <tr>
+            <td>T01</td><td>2</td><td>창가 구역</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T02</td><td>2</td><td>창가 구역</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T03</td><td>4</td><td>창가 구역</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T04</td><td>4</td><td>홀 중앙</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T05</td><td>2</td><td>홀 중앙</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T06</td><td>2</td><td>바 카운터</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T07</td><td>4</td><td>홀 중앙</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T08</td><td>6</td><td>홀 중앙</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T09</td><td>2</td><td>홀 중앙</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T10</td><td>2</td><td>바 카운터</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T11</td><td>2</td><td>바 카운터</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+        </tbody></table>
+      </div>
+      <div style="margin-bottom:12px">
+        <b>2층</b>
+        <span class="pill mut">테이블 4개 · 시설물 1개</span>
+        <table style="margin-top:6px">
+          <tbody><tr><th>번호</th><th>좌석</th><th>구역</th><th>사용</th></tr>
+          <tr>
+            <td>R01</td><td>8</td><td>단체룸</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T21</td><td>2</td><td>테라스</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T23</td><td>4</td><td>테라스</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+          <tr>
+            <td>T24</td><td>4</td><td>라운지</td>
+            <td><span class="pill ok">사용</span></td>
+          </tr>
+        </tbody></table>
+      </div>
+    </section>
+  </div>
+
+  <section id="reservations">
+    <h2><span class="step">⑤</span>예약 조회와 저장</h2>
+    <p class="what">점주 화면처럼 "우리 매장의 그날 예약"을 <code>findByStoreIdAndVisitDate</code>로 읽습니다(예약.매장_ID 덕분에 조인 없이 조회). 아래에서 예약을 저장하면 실제 <code>reservation</code> 테이블에 들어가고 목록에 바로 보입니다.</p>
+    <form onsubmit="return false" class="row" method="get" action="/dev/db">
+      <label>날짜<input disabled type="date" name="date" value="2026-10-10"></label>
+      <button disabled class="ghost" type="submit">조회</button>
+    </form>
+    <table style="margin-top:8px">
+      <tbody><tr><th>예약번호</th><th>시간</th><th>테이블</th><th>인원</th><th>예약자</th><th>구분</th><th>경로</th><th>상태</th></tr>
+      
+      <tr>
+        <td><code>BT-20261010-0004</code></td><td>12:00 – 13:30</td><td>T04</td>
+        <td>4</td><td>김민지</td><td>회원 #4</td><td>WEB</td>
+        <td><span class="pill mut">BOOKED</span> </td>
+      </tr>
+      <tr>
+        <td><code>BT-20261010-0003</code></td><td>18:00 – 19:30</td><td>T06</td>
+        <td>2</td><td>최도윤</td><td>비회원</td><td>PHONE</td>
+        <td><span class="pill mut">BOOKED</span> </td>
+      </tr>
+      <tr>
+        <td><code>BT-20261010-0001</code></td><td>18:30 – 20:00</td><td>T05</td>
+        <td>2</td><td>정하늘</td><td>비회원</td><td>WEB</td>
+        <td><span class="pill mut">BOOKED</span> </td>
+      </tr>
+      <tr>
+        <td><code>BT-20261010-0002</code></td><td>19:00 – 20:30</td><td>T09</td>
+        <td>2</td><td>한지우</td><td>비회원</td><td>CHAT</td>
+        <td><span class="pill mut">BOOKED</span> </td>
+      </tr>
+    </tbody></table>
+    <form onsubmit="return false" class="row" method="post" action="/dev/db/book" style="margin-top:14px">
+      <label>테이블<select disabled name="tableId">
+        <optgroup label="1층">
+          <option value="1">T01 (2인)</option>
+          <option value="2">T02 (2인)</option>
+          <option value="3" selected="selected">T03 (4인)</option>
+          <option value="4">T04 (4인)</option>
+          <option value="5">T05 (2인)</option>
+          <option value="6">T06 (2인)</option>
+          <option value="7">T07 (4인)</option>
+          <option value="8">T08 (6인)</option>
+          <option value="9">T09 (2인)</option>
+          <option value="10">T10 (2인)</option>
+          <option value="11">T11 (2인)</option>
+        </optgroup><optgroup label="2층">
+          <option value="15">R01 (8인)</option>
+          <option value="12">T21 (2인)</option>
+          <option value="13">T23 (4인)</option>
+          <option value="14">T24 (4인)</option>
+        </optgroup></select></label>
+      <label>날짜<input disabled type="date" name="date" value="2026-10-10"></label>
+      <label>시작<input disabled type="time" name="start" value="19:00" step="1800"></label>
+      <label>인원<input disabled type="number" name="party" value="2" min="1" max="8" style="width:70px"></label>
+      <label>예약자<input disabled type="text" name="name" value="시연 손님" style="width:110px"></label>
+      <button disabled type="submit">예약 저장</button>
+    </form>
+    
+  <div style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px"><p style="margin:0 0 6px;font-weight:700">실행 기록: T03, 10월 10일 19:00, 2명을 &quot;예약 저장&quot; 두 번</p><p class="msg ok">1번째: 저장됨: DEMO-1103120639711</p><p class="msg no">2번째(같은 자리·시간): 거절: 이미 예약된 시간입니다</p></div></section>
+
+  <section id="overlap">
+    <h2><span class="step">⑥</span>겹침 검사</h2>
+    <p class="what">같은 테이블·같은 날·확정 또는 방문 상태 예약 중 <b>기존 시작 &lt; 새 종료 그리고 새 시작 &lt; 기존 종료</b>이면 겹칩니다. 예: 10월 10일 T09는 19:00–20:30 예약이 있어서 19:30은 겹치고, 20:30은 겹치지 않습니다.</p>
+    <form onsubmit="return false" class="row" method="post" action="/dev/db/overlap">
+      <label>테이블<select disabled name="tableId">
+        <optgroup label="1층">
+          <option value="1">T01</option>
+          <option value="2">T02</option>
+          <option value="3">T03</option>
+          <option value="4">T04</option>
+          <option value="5">T05</option>
+          <option value="6">T06</option>
+          <option value="7">T07</option>
+          <option value="8">T08</option>
+          <option value="9" selected="selected">T09</option>
+          <option value="10">T10</option>
+          <option value="11">T11</option>
+        </optgroup><optgroup label="2층">
+          <option value="15">R01</option>
+          <option value="12">T21</option>
+          <option value="13">T23</option>
+          <option value="14">T24</option>
+        </optgroup></select></label>
+      <label>날짜<input disabled type="date" name="date" value="2026-10-10"></label>
+      <label>시작<input disabled type="time" name="start" value="19:30" step="1800"></label>
+      <button disabled type="submit">겹침 확인</button>
+    </form>
+    
+  <div style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px"><p style="margin:0 0 6px;font-weight:700">실행 기록: T09, 10월 10일</p><p class="msg no">19:30 시작 → 겹치는 예약 1건 → 예약할 수 없습니다</p><p class="msg ok">20:30 시작 → 겹치는 예약 0건 → 예약할 수 있습니다</p></div></section>
+
+  <section id="race">
+    <h2><span class="step">⑦</span>두 손님이 같은 자리를 동시에 예약하면</h2>
+    <p class="what">손님 A와 B가 0.3초 차이로 같은 테이블·같은 시간을 예약합니다. A는 확인 후 저장 전에 2초 머뭅니다(느린 상황 재현). 누를 때마다 같은 자리의 이전 시연 예약은 지우고 새로 시작하므로, 두 버튼을 번갈아 눌러 비교할 수 있습니다.</p>
+    <div class="flow"><span>① 트랜잭션 시작</span><b>→</b><span>② 테이블 행 잠금 (SELECT … FOR UPDATE)</span><b>→</b><span>③ 겹침 다시 확인</span><b>→</b><span>④ 저장</span><b>→</b><span>⑤ 커밋 (잠금 풀림)</span></div>
+    <form onsubmit="return false" class="row" method="post" action="/dev/db/race">
+      <label>테이블<select disabled name="tableId">
+        <optgroup label="1층">
+          <option value="1">T01</option>
+          <option value="2">T02</option>
+          <option value="3" selected="selected">T03</option>
+          <option value="4">T04</option>
+          <option value="5">T05</option>
+          <option value="6">T06</option>
+          <option value="7">T07</option>
+          <option value="8">T08</option>
+          <option value="9">T09</option>
+          <option value="10">T10</option>
+          <option value="11">T11</option>
+        </optgroup><optgroup label="2층">
+          <option value="15">R01</option>
+          <option value="12">T21</option>
+          <option value="13">T23</option>
+          <option value="14">T24</option>
+        </optgroup></select></label>
+      <label>날짜<input disabled type="date" name="date" value="2026-10-10"></label>
+      <label>시작<input disabled type="time" name="start" value="21:00" step="1800"></label>
+      <button disabled type="submit" name="lock" value="true">잠금 켜고 동시 예약</button>
+      <button disabled type="submit" name="lock" value="false" class="warn">잠금 끄고 동시 예약</button>
+    </form>
+    
+    <form onsubmit="return false" method="post" action="/dev/db/reset" style="margin-top:12px">
+      <input disabled type="hidden" name="date" value="2026-10-10">
+      <button disabled class="ghost" type="submit">시연 데이터 초기화 (DEMO- 예약만 삭제)</button>
+    </form>
+    
+  <div style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px"><p style="margin:0 0 6px;font-weight:700">실행 기록: T03, 10월 10일 21:00, 손님 A·B 동시 예약</p><div style="margin-top:12px">
+      <p style="margin:0 0 6px;font-weight:700">결과: 잠금 켬</p>
+      <table>
+        <tbody><tr><th>손님</th><th>요청 시각</th><th>응답 시각</th><th>걸린 시간</th><th>결과</th></tr>
+        <tr>
+          <td>손님 A</td><td><code>12:06:40.144</code></td><td><code>12:06:42.157</code></td>
+          <td>2.0초</td>
+          <td><span class="pill ok">저장됨 (DEMO-1103120640144A)</span></td>
+        </tr>
+        <tr>
+          <td>손님 B</td><td><code>12:06:40.445</code></td><td><code>12:06:42.161</code></td>
+          <td>1.7초</td>
+          <td><span class="pill no">거절: 이미 예약된 시간입니다</span></td>
+        </tr>
+      </tbody></table>
+      <p class="msg ok">B는 A가 커밋할 때까지 기다렸다가 다시 확인해서 겹침을 발견하고 거절됐습니다. 같은 자리에 예약은 1건만 남습니다.</p>
+      
+    </div><div style="height:10px"></div><div style="margin-top:12px">
+      <p style="margin:0 0 6px;font-weight:700">결과: 잠금 끔</p>
+      <table>
+        <tbody><tr><th>손님</th><th>요청 시각</th><th>응답 시각</th><th>걸린 시간</th><th>결과</th></tr>
+        <tr>
+          <td>손님 A</td><td><code>12:06:42.363</code></td><td><code>12:06:44.376</code></td>
+          <td>2.0초</td>
+          <td><span class="pill ok">저장됨 (DEMO-1103120642362A)</span></td>
+        </tr>
+        <tr>
+          <td>손님 B</td><td><code>12:06:42.664</code></td><td><code>12:06:42.674</code></td>
+          <td>0.0초</td>
+          <td><span class="pill ok">저장됨 (DEMO-1103120642362B)</span></td>
+        </tr>
+      </tbody></table>
+      
+      <p class="msg no">잠금이 없으면 B가 확인하는 순간 A가 아직 저장 전이라 둘 다 "겹침 0건"으로 보고 둘 다 저장됩니다. ⑤ 목록에서 같은 자리 중복을 확인한 뒤 아래 초기화를 누르세요.</p>
+    </div><p style="margin:10px 0 4px;font-weight:700">잠금 끔 직후 10월 10일 예약 목록 (T03 21:00이 2건 = 중복 예약)</p><table style="margin-top:8px">
+      <tbody><tr><th>예약번호</th><th>시간</th><th>테이블</th><th>인원</th><th>예약자</th><th>구분</th><th>경로</th><th>상태</th></tr>
+      
+      <tr>
+        <td><code>BT-20261010-0004</code></td><td>12:00 – 13:30</td><td>T04</td>
+        <td>4</td><td>김민지</td><td>회원 #4</td><td>WEB</td>
+        <td><span class="pill mut">BOOKED</span> </td>
+      </tr>
+      <tr>
+        <td><code>BT-20261010-0003</code></td><td>18:00 – 19:30</td><td>T06</td>
+        <td>2</td><td>최도윤</td><td>비회원</td><td>PHONE</td>
+        <td><span class="pill mut">BOOKED</span> </td>
+      </tr>
+      <tr>
+        <td><code>BT-20261010-0001</code></td><td>18:30 – 20:00</td><td>T05</td>
+        <td>2</td><td>정하늘</td><td>비회원</td><td>WEB</td>
+        <td><span class="pill mut">BOOKED</span> </td>
+      </tr>
+      <tr>
+        <td><code>BT-20261010-0002</code></td><td>19:00 – 20:30</td><td>T09</td>
+        <td>2</td><td>한지우</td><td>비회원</td><td>CHAT</td>
+        <td><span class="pill mut">BOOKED</span> </td>
+      </tr>
+      <tr>
+        <td><code>DEMO-1103120639711</code></td><td>19:00 – 20:30</td><td>T03</td>
+        <td>2</td><td>시연 손님</td><td>비회원</td><td>WEB</td>
+        <td><span class="pill mut">BOOKED</span> </td>
+      </tr>
+      <tr>
+        <td><code>DEMO-1103120642362B</code></td><td>21:00 – 22:30</td><td>T03</td>
+        <td>2</td><td>손님 B</td><td>비회원</td><td>WEB</td>
+        <td><span class="pill mut">BOOKED</span> </td>
+      </tr>
+      <tr>
+        <td><code>DEMO-1103120642362A</code></td><td>21:00 – 22:30</td><td>T03</td>
+        <td>2</td><td>손님 A</td><td>비회원</td><td>WEB</td>
+        <td><span class="pill mut">BOOKED</span> </td>
+      </tr>
+    </tbody></table></div></section>
+
+  <section id="member">
+    <h2><span class="step">⑧</span>회원과 비회원 조회</h2>
+    <p class="what">회원 예약은 <code>account_id</code>가 있어서 계정으로, 비회원 예약은 <code>account_id</code>가 비어 있고 메일 링크의 <code>lookup_token</code>으로 찾습니다.</p>
+    <div class="grid2">
+      <div>
+        <b>회원 #4 (김민지)의 "내 예약"</b>
+        <table style="margin-top:6px">
+          <tbody><tr><th>예약번호</th><th>일시</th><th>테이블</th><th>상태</th></tr>
+          <tr><td><code>BT-20261010-0004</code></td><td>2026-10-10 12:00</td><td>T04</td><td>BOOKED</td></tr>
+          <tr><td><code>BT-20261003-0007</code></td><td>2026-10-03 18:00</td><td>T01</td><td>VISITED</td></tr>
+        </tbody></table>
+      </div>
+      <div>
+        <b>비회원 조회 토큰</b>
+        <form onsubmit="return false" class="row" method="get" action="/dev/db">
+          <input disabled type="hidden" name="date" value="2026-10-10">
+          <label>토큰<input disabled type="text" name="token" value="aB3dE5fG7hJ9kL1mN3pQ5r" style="width:230px"></label>
+          <button disabled class="ghost" type="submit">조회</button>
+        </form>
+        <p class="msg ok">BT-20261010-0001 · 정하늘 · 2026-10-10 18:30 · T05</p>
+        
+      </div>
+    </div>
+  </section>
+
+</main>
+
+
+</body></html>

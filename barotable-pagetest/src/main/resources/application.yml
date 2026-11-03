@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: barotable
+
+  # DB 비밀번호는 application-local.yml에 따로 둔다 (Git에 올라가지 않음)
+  config:
+    import: optional:classpath:application-local.yml
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/barotable?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # 서버가 켜질 때 테이블 9개를 만들고(이미 있으면 그대로) 시험 데이터를 넣는다(이미 있으면 건너뜀)
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath:db/data.sql
+      encoding: UTF-8
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # 테이블은 schema.sql이 만들고, JPA는 엔티티와 테이블이 맞는지 검사만 한다
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+
+  thymeleaf:
+    cache: false
+
+server:
+  port: 8080
