@@ -41,4 +41,16 @@ public class Account {
 
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /** 손님 회원가입 (비밀번호는 해시로만 저장) */
+    public static Account customer(String email, String passwordHash, String name, String phone) {
+        Account a = new Account();
+        a.email = email;
+        a.passwordHash = passwordHash;
+        a.name = name;
+        a.phone = phone;
+        a.role = Role.CUSTOMER;
+        a.status = AccountStatus.ACTIVE;
+        return a;
+    }
 }

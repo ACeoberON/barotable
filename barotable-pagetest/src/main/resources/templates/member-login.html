@@ -6,10 +6,10 @@
   <title>바로테이블 · 회원 로그인</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap">
-  <link rel="stylesheet" href="../static/css/app.css?v=20261103a" th:href="@{/css/app.css}">
-  <link rel="stylesheet" href="../static/css/responsive.css?v=20261103a" th:href="@{/css/responsive.css}">
-  <link rel="stylesheet" href="../static/css/member-login.css?v=20261103a" th:href="@{/css/member-login.css}">
-  <link rel="stylesheet" href="../static/css/ui.css?v=20261103a" th:href="@{/css/ui.css}">
+  <link rel="stylesheet" href="../static/css/app.css?v=20261110a" th:href="@{/css/app.css}">
+  <link rel="stylesheet" href="../static/css/responsive.css?v=20261110a" th:href="@{/css/responsive.css}">
+  <link rel="stylesheet" href="../static/css/member-login.css?v=20261110a" th:href="@{/css/member-login.css}">
+  <link rel="stylesheet" href="../static/css/ui.css?v=20261110a" th:href="@{/css/ui.css}">
 </head>
 <!-- M-01 회원 로그인 -->
 <body data-depth="0" data-screen="member-login" th:data-server="true">
@@ -24,11 +24,26 @@
 <p class="hint">시연용 회원 계정: member@example.com / barotable</p>
 </form>
 <div class="member-login-links"><a data-go="lookup" href="lookup.html" th:href="@{/reservations/lookup}">비회원 예약 조회</a><span aria-hidden="true">·</span><a data-go="reserve" href="reserve.html" th:href="@{/reserve}">비회원으로 예약하기</a></div>
+</section>
+<section class="card stack member-login-card" aria-labelledby="member-signup-title"><h2 id="member-signup-title">회원가입</h2>
+<p class="hint">가입하면 예약할 때 이름·연락처가 자동으로 채워지고, 이 계정으로 예약 내역을 볼 수 있어요. 비회원 예약도 그대로 쓸 수 있어요.</p>
+<form id="member-signup-form" class="stack" autocomplete="on" novalidate>
+<div class="field"><label for="su-name">이름</label><input class="input" id="su-name" type="text" autocomplete="name" maxlength="50" required/></div>
+<div class="field"><label for="su-phone">휴대전화</label><input class="input" id="su-phone" type="tel" autocomplete="tel" inputmode="numeric" placeholder="010-0000-0000" maxlength="13" required/></div>
+<div class="field"><label for="su-email">이메일</label><input class="input" id="su-email" type="email" autocomplete="email" maxlength="100" required/></div>
+<div class="field"><label for="su-password">비밀번호 (8자 이상)</label><input class="input" id="su-password" type="password" autocomplete="new-password" minlength="8" maxlength="64" required/></div>
+<div class="field"><label for="su-password2">비밀번호 확인</label><input class="input" id="su-password2" type="password" autocomplete="new-password" maxlength="64" required/></div>
+<button class="btn btn-ghost btn-block" type="submit">가입하기</button>
+<p class="notice" id="member-signup-message" role="status" aria-live="polite" hidden></p>
+</form>
 </section></main>
 
-  <script src="../static/js/data.js?v=20261103a" th:src="@{/js/data.js}"></script>
-  <script src="../static/js/common.js?v=20261103a" th:src="@{/js/common.js}"></script>
-  <script src="../static/js/member.js?v=20261103a" th:src="@{/js/member.js}"></script>
-  <script src="../static/js/drag-scroll.js?v=20261103a" th:src="@{/js/drag-scroll.js}"></script>
+  <script src="../static/js/data.js?v=20261110a" th:src="@{/js/data.js}"></script>
+  <!-- 서버에서 열면 DB 값(매장·좌석도·예약)을 받아 하드코딩 데이터를 바꿔 끼운다. GitHub Pages에서는 src가 없어 건너뜀 -->
+  <script th:src="@{/api/boot.js}"></script>
+  <script src="../static/js/db-sync.js?v=20261110a" th:src="@{/js/db-sync.js}"></script>
+  <script src="../static/js/common.js?v=20261110a" th:src="@{/js/common.js}"></script>
+  <script src="../static/js/member.js?v=20261110a" th:src="@{/js/member.js}"></script>
+  <script src="../static/js/drag-scroll.js?v=20261110a" th:src="@{/js/drag-scroll.js}"></script>
 </body>
 </html>

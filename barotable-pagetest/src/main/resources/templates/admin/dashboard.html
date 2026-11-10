@@ -6,10 +6,10 @@
   <title>바로테이블 · 서비스 관리자</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap">
-  <link rel="stylesheet" href="../../static/css/app.css?v=20261103a" th:href="@{/css/app.css}">
-  <link rel="stylesheet" href="../../static/css/responsive.css?v=20261103a" th:href="@{/css/responsive.css}">
-  <link rel="stylesheet" href="../../static/css/ui.css?v=20261103a" th:href="@{/css/ui.css}">
-  <link rel="stylesheet" href="../../static/css/owner.css?v=20261103a" th:href="@{/css/owner.css}">
+  <link rel="stylesheet" href="../../static/css/app.css?v=20261110a" th:href="@{/css/app.css}">
+  <link rel="stylesheet" href="../../static/css/responsive.css?v=20261110a" th:href="@{/css/responsive.css}">
+  <link rel="stylesheet" href="../../static/css/ui.css?v=20261110a" th:href="@{/css/ui.css}">
+  <link rel="stylesheet" href="../../static/css/owner.css?v=20261110a" th:href="@{/css/owner.css}">
 </head>
 <!-- A-02 서비스 관리자 (점주 계정 승인 · 서비스 상태) -->
 <body data-depth="1" data-screen="admin" th:data-server="true">
@@ -64,9 +64,12 @@
 </div>
 <div aria-live="polite" id="admin-dialog-root"></div>
 
-  <script src="../../static/js/data.js?v=20261103a" th:src="@{/js/data.js}"></script>
-  <script src="../../static/js/common.js?v=20261103a" th:src="@{/js/common.js}"></script>
-  <script src="../../static/js/pages/admin.js?v=20261103a" th:src="@{/js/pages/admin.js}"></script>
-  <script src="../../static/js/drag-scroll.js?v=20261103a" th:src="@{/js/drag-scroll.js}"></script>
+  <script src="../../static/js/data.js?v=20261110a" th:src="@{/js/data.js}"></script>
+  <!-- 서버에서 열면 DB 값(매장·좌석도·예약)을 받아 하드코딩 데이터를 바꿔 끼운다. GitHub Pages에서는 src가 없어 건너뜀 -->
+  <script th:src="@{/api/boot.js}"></script>
+  <script src="../../static/js/db-sync.js?v=20261110a" th:src="@{/js/db-sync.js}"></script>
+  <script src="../../static/js/common.js?v=20261110a" th:src="@{/js/common.js}"></script>
+  <script src="../../static/js/pages/admin.js?v=20261110a" th:src="@{/js/pages/admin.js}"></script>
+  <script src="../../static/js/drag-scroll.js?v=20261110a" th:src="@{/js/drag-scroll.js}"></script>
 </body>
 </html>

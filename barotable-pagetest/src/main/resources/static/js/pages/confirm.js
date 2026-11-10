@@ -2,7 +2,9 @@
 (function () {
   const $ = s => document.querySelector(s);
   const fl = BT.floors(), d = BT.draft();
-  const t = BT.findTable(d.table, fl) || BT.findTable('T03', fl);
+  /* 화면 목록으로 바로 들어와 고른 좌석이 없으면 T03으로 화면만 보여 준다. 확정은 막는다 */
+  const picked = BT.findTable(d.table, fl);
+  const t = picked || BT.findTable('T03', fl);
   const z = BT.zoneOf(t, fl);
   /* 회원으로 로그인했으면 아직 입력하지 않은 칸을 회원 정보로 채운다 */
   const me = window.Member && Member.current();
@@ -40,7 +42,37 @@
     if (!/^01[016789]\d{7,8}$/.test(digits)) return fail(phoneInput, '올바른 휴대전화 번호를 입력해 주세요.');
     if (email && !$('#c-email').checkValidity()) return fail($('#c-email'), '올바른 이메일 주소를 입력해 주세요.');
     if (!$('#c-agree').checked) return fail($('#c-agree'), '개인정보 수집·이용 동의가 필요합니다.');
-    BT.saveDraft({name,phone,email,request:$('#c-req').value.trim(),confirmed:true});
-    BT.go('complete');
+    const request = $('#c-req').value.trim();
+    /* 이미 확정한 예약을 새로고침 · 뒤로가기로 다시 보낸 경우: 새로 만들지 않고 완료 화면으로 */
+    if (d.confirmed && d.no && BT.reservations().some(r => r.no === d.no)) { BT.go('complete'); return; }
+    if (!picked) {
+      error.hidden = false;
+      error.innerHTML = `좌석을 먼저 골라 주세요. <a href="${BT.url('reserve')}">좌석 고르기</a>`;
+      return;
+    }
+    /* 저장 직전 재검사: 좌석도를 본 뒤 다른 예약이 들어왔거나 시간이 지났을 수 있다 (서버도 같은 규칙으로 다시 검사) */
+    const bad = BT.checkSeat(t, { date: d.date, time: d.time, party: d.party }, BT.reservations(), fl);
+    if (bad) {
+      error.hidden = false;
+      error.innerHTML = `${BT.esc(t.id)} 자리는 지금 예약할 수 없어요. ${BT.esc(bad.reason)}. <a href="${BT.url('reserve')}">좌석 다시 고르기</a>`;
+      BT.saveDraft({ table: null });
+      return;
+    }
+    if (!(window.API && API.on)) {   // 정적 화면(GitHub Pages): 이 브라우저의 예약 목록에만 저장
+      const no = BT.newGuestNo(d.date);
+      BT.addReservation({ no, date: d.date, time: d.time, name, phone, email, party: d.party, table: t.id, status: 'booked', request });
+      BT.saveDraft({ name, phone, email, request, confirmed: true, no });
+      return BT.go('complete');
+    }
+    /* 서버: DB에 예약 저장 (테이블 행 잠금 → 규칙·겹침 확인 → 저장). 실패하면 이유를 보여 준다 */
+    const btn = $('#finish-booking');
+    if (btn) btn.disabled = true;
+    API.post('/api/reservations', { table: t.id, date: d.date, time: d.time, party: d.party, name, phone, email: email || null, request: request || null })
+      .then(r => { BT.saveDraft({ name, phone, email, request, confirmed: true, no: r.no, token: r.token || null }); BT.go('complete'); })
+      .catch(e => {
+        if (btn) btn.disabled = false;
+        error.hidden = false;
+        error.innerHTML = `${BT.esc(e.message)} <a href="${BT.url('reserve')}">좌석 다시 고르기</a>`;
+      });
   });
 })();

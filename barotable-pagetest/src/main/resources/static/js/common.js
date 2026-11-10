@@ -55,24 +55,50 @@ window.BT = (function () {
    * confirmed: 예약자 정보 화면에서 '예약 확정하기'를 눌렀는지 */
   const DEFAULT_DRAFT = { date: D.DEMO_DATE, time: '19:00', party: 4, table: 'T03', request: '', name: '', phone: '', email: '', confirmed: false };
   const draft = () => Object.assign({}, DEFAULT_DRAFT, sget('bt.draft', {}));
-  const saveDraft = p => { const d = Object.assign(draft(), p); sset('bt.draft', d); return d; };
+  const saveDraft = p => {
+    const d = Object.assign(draft(), p);
+    /* 날짜·시간·인원·테이블을 다시 고르면 새 예약이므로 지난 예약번호·토큰은 지운다 */
+    const changed = ['date', 'time', 'party', 'table'].some(k => k in p);
+    if (changed && !('no' in p)) d.no = null;
+    if (changed && !('token' in p)) d.token = null;
+    sset('bt.draft', d); return d;
+  };
 
   /* ---------- 예약 상태 ----------
    * 원본은 BT_DATA.OWNER_RESERVATIONS + 손님 화면에서 만든 예약(draft) 하나.
    * 취소·노쇼·방문·테이블 이동·워크인처럼 바뀐 부분만 sessionStorage('bt.res')에 쌓는다.
    * 실제 구현: GET/PATCH /api/owner/reservations, POST /api/reservations/lookup */
   const NOW = D.OWNER_NOW;
-  const guestNo = d => 'BT-' + d.date.replace(/-/g, '') + '-0031';
+  /* 서버에서 저장한 예약이면 서버가 정한 번호(draft.no), 정적 화면이면 시연용 번호 */
+  const guestNo = d => d.no || ('BT-' + d.date.replace(/-/g, '') + '-0101');
   const resLog = () => sget('bt.res', { patch: {}, added: [] });
+  /* 매장 전체 예약 = 기본 예약(서버: DB, 정적: 하드코딩) + 점주·손님이 새로 만든 예약(log.added).
+   * 손님 화면 · 점주 화면이 모두 이 목록 하나만 본다. */
   function reservations() {
-    const log = resLog(), d = draft();
+    const log = resLog();
     const base = D.OWNER_RESERVATIONS.map(r => Object.assign({ date: D.OWNER_TODAY }, r));
-    const mine = { no: guestNo(d), date: d.date, time: d.time, name: d.name || '', phone: d.phone || '', email: d.email || '', party: d.party, table: d.table, status: 'booked', request: d.request || '' };
-    /* 손님 예약은 예약자 정보를 입력하고 확정한 뒤에만 예약 목록에 들어간다 */
-    if (d.confirmed && d.name && d.phone && !base.some(r => r.no === mine.no)) base.push(mine);
     return base.concat(log.added).map(r => Object.assign({}, r, log.patch[r.no]));
   }
-  function updateReservation(no, change) { const log = resLog(); log.patch[no] = Object.assign(log.patch[no] || {}, change); sset('bt.res', log); }
+  /* 같은 날짜에 아직 안 쓴 손님 예약번호 (0101부터, 정적 화면용. 서버는 서버가 번호를 정한다) */
+  function newGuestNo(date) {
+    const used = new Set(reservations().map(r => r.no)), ymd = date.replace(/-/g, '');
+    for (let i = 101; i < 10000; i++) { const no = `BT-${ymd}-${String(i).padStart(4, '0')}`; if (!used.has(no)) return no; }
+    return `BT-${ymd}-${Date.now() % 10000}`;
+  }
+  function updateReservation(no, change) {
+    const log = resLog(); log.patch[no] = Object.assign(log.patch[no] || {}, change); sset('bt.res', log);
+    /* 서버에서 열었고 DB에 있는 예약이면 상태·테이블 변경을 DB에도 저장 (PATCH /api/owner/reservations/{no}) */
+    const body = {};
+    if (change.status) body.status = change.status;
+    if (change.table) body.table = change.table;
+    if (window.API && API.on && (body.status || body.table) && D.OWNER_RESERVATIONS.some(r => r.no === no)) {
+      API.patch('/api/owner/reservations/' + encodeURIComponent(no), body).catch(e => {
+        /* 저장 실패: 화면 변경을 되돌리고 DB 값으로 다시 그린다 */
+        const l = resLog(); delete l.patch[no]; sset('bt.res', l);
+        toast(e.message); setTimeout(() => location.reload(), 1500);
+      });
+    }
+  }
   function addReservation(r) { const log = resLog(); log.added.push(r); sset('bt.res', log); }
   /* 점주가 직접 만든 배정(워크인 · 전화 예약)만 지울 수 있다 */
   function removeReservation(no) { const log = resLog(); log.added = log.added.filter(r => r.no !== no); delete log.patch[no]; sset('bt.res', log); }
@@ -96,12 +122,15 @@ window.BT = (function () {
   const byToken = t => (t ? reservations().find(r => tokenOf(r.no) === t) : null) || null;
   /* 방문일이 지나면 만료 (방문 당일까지 유효) */
   const tokenExpired = r => r.date < TODAY;
-  const lookupUrl = no => url('lookup') + '?t=' + tokenOf(no);
+  /* 서버에서 방금 저장한 비회원 예약이면 서버가 만든 진짜 토큰을 쓴다 */
+  const lookupUrl = no => { const d = draft(); return url('lookup') + '?t=' + (d.no === no && d.token ? d.token : tokenOf(no)); };
 
   /* ---------- 좌석 규칙 (손님 추천 · 워크인 · 테이블 이동 공통) ----------
    * 좌석 수와 구역 인원 조건 위반이면 이유 문자열, 괜찮으면 null */
   function seatRule(t, party, fl) {
     if (t.seats < party) return `${t.seats}인 테이블이라 ${party}명은 앉을 수 없어요`;
+    /* 2명 이하는 6인 이상 · 단체 · 룸 테이블에 앉지 않는다 (큰 자리는 단체 손님용으로 남김) */
+    if (party <= 2 && (t.seats >= 6 || (t.tags || []).includes('단체') || t.shape === 'room')) return '단체석은 3명 이상부터 이용할 수 있어요';
     const z = zoneOf(t, fl);
     if (z && z.minParty && party < z.minParty) return `${z.name}은 ${z.minParty}명 이상만 받아요`;
     if (z && z.maxParty && party > z.maxParty) return `${z.name}은 ${z.maxParty}명까지만 받아요`;
@@ -111,6 +140,32 @@ window.BT = (function () {
   function tableClash(tableId, date, time, list, except) {
     const dine = store().dineMinutes;
     return list.find(r => r.no !== except && isActive(r) && r.table === tableId && r.date === date && Math.abs(toMin(r.time) - toMin(time)) < dine) || null;
+  }
+  /* 같은 날짜 · 같은 시각의 유효 예약 수가 시간대별 한도(slotLimit)에 찼는지 */
+  function slotFull(date, time, list, except) {
+    if (!store().slotLimit) return false;   // 한도 없음(DB 값 NULL)
+    return list.filter(r => r.no !== except && isActive(r) && r.date === date && r.time === time).length >= store().slotLimit;
+  }
+  /* 손님 좌석도 · 예약 확정 · 점주 배정이 함께 쓰는 판정.
+   * 문제가 있으면 { kind, reason }, 앉을 수 있으면 null
+   *   kind: time(지난 시간 · 영업시간 밖 · 브레이크) | rule(좌석 수 · 단체석 · 구역 인원) | reserved(이용 시간 겹침) | full(시간대 한도) */
+  function checkSeat(t, c, list, fl, except) {
+    if (!t) return { kind: 'rule', reason: '테이블을 찾을 수 없어요' };
+    if (c.date < TODAY || (c.date === TODAY && toMin(c.time) <= toMin(NOW))) return { kind: 'time', reason: '이미 지난 시간이에요' };
+    const tc = timeCheck(c.time);
+    if (!tc.ok) return { kind: 'time', reason: tc.reason };
+    const rule = seatRule(t, c.party, fl);
+    if (rule) return { kind: 'rule', reason: rule };
+    const hit = tableClash(t.id, c.date, c.time, list, except);
+    if (hit) {
+      const dine = store().dineMinutes;
+      const reason = toMin(hit.time) <= toMin(c.time)
+        ? `${hit.time} 예약이 ${toHHMM(toMin(hit.time) + dine)}까지 이 자리를 써요`
+        : `${hit.time}에 다음 예약이 있어 ${dine}분 동안 앉을 수 없어요`;
+      return { kind: 'reserved', reason, hit };
+    }
+    if (slotFull(c.date, c.time, list, except)) return { kind: 'full', reason: `${c.time}은 예약 한도(${store().slotLimit}팀)가 찼어요` };
+    return null;
   }
 
   /* ---------- 날짜 / 시간 ---------- */
@@ -215,5 +270,5 @@ window.BT = (function () {
   });
 
   return { YEAR, MONTH, TODAY, NOW, store, saveStore, resetStore, floors, allTables, findTable, zoneOf, url, go, draft, saveDraft,
-    guestNo, reservations, updateReservation, addReservation, removeReservation, resetReservations, isActive, tokenOf, byToken, tokenExpired, lookupUrl, seatRule, tableClash, sget, sset, sremove, pad, toMin, toHHMM, parseDate, iso, fmtDate, octoberDays, slots, timeCheck, esc, toast };
+    guestNo, newGuestNo, reservations, updateReservation, addReservation, removeReservation, resetReservations, isActive, tokenOf, byToken, tokenExpired, lookupUrl, seatRule, tableClash, slotFull, checkSeat, sget, sset, sremove, pad, toMin, toHHMM, parseDate, iso, fmtDate, octoberDays, slots, timeCheck, esc, toast };
 })();

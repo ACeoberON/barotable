@@ -6,7 +6,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 /**
  * 프로토타입 화면을 서버 주소로 보여 준다.
  * 주소는 static/js/common.js 의 ROUTES 와 같다.
- * 아직 화면 데이터는 JS에 하드코딩돼 있고, 다음 단계에서 DB 값으로 바꾼다.
+ * 화면 데이터는 /api/boot.js(DB 값)를 받아 쓰고, 저장은 /api/** 로 한다 (com.barotable.api 패키지).
+ * GitHub Pages(정적)에서는 하드코딩 데이터(static/js/data.js)로 그대로 동작한다.
  */
 @Controller
 public class PageController {
