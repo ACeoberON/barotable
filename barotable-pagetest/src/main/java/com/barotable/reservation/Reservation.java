@@ -107,4 +107,24 @@ public class Reservation {
         r.tokenExpiresAt = tokenExpiresAt;
         return r;
     }
+
+    /** 웹 화면에서 만든 예약. 회원이면 account, 비회원이면 조회 토큰을 채운다 */
+    public static Reservation web(String reservationNo, DiningTable table, Account account, String name, String phone,
+                                  String email, LocalDate date, LocalTime start, int dineMinutes, int party,
+                                  String request, String token, LocalDateTime tokenExpiresAt) {
+        Reservation r = guest(reservationNo, table, name, phone, email, date, start, dineMinutes, party, token, tokenExpiresAt);
+        r.account = account;
+        r.request = request;
+        return r;
+    }
+
+    /** 점주 화면: 방문 / 노쇼 / 취소 처리 */
+    public void changeStatus(ReservationStatus status) {
+        this.status = status;
+    }
+
+    /** 점주 화면: 테이블 이동 (겹침 검사는 서비스에서) */
+    public void moveTo(DiningTable table) {
+        this.table = table;
+    }
 }

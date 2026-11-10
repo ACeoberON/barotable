@@ -11,6 +11,9 @@
   const digits = s => String(s || '').replace(/\D/g, '');
   const STATUS = { booked: ['예약 확정', 'badge-teal'], visited: ['방문 완료', 'badge-blue'], noshow: ['노쇼 처리됨', 'badge-coral'], cancelled: ['취소됨', 'badge-gray'] };
   let current = null, asking = false, miss = '';
+  /* 서버 모드: 조회에 쓴 값(토큰 또는 연락처)을 취소 요청 때 본인 확인용으로 다시 보낸다 */
+  const SERVER = !!(window.API && API.on);
+  let proof = {};
 
   /* 시연용 기본값: 오늘 날짜로 만든 강태민 님 예약번호 */
   const lkNo = $('#lk-no');
@@ -94,6 +97,12 @@
     on('ask', () => { asking = true; render(); box.querySelector('[data-act="no"]').focus(); });
     on('no', () => { asking = false; render(); });
     on('yes', () => {
+      if (SERVER) {   // 서버가 상태·시간을 다시 확인하고 취소한다
+        API.post('/api/reservations/' + encodeURIComponent(r.no) + '/cancel', proof)
+          .then(x => { current = x; asking = false; render(); BT.toast('예약을 취소했어요'); })
+          .catch(e => { asking = false; render(); BT.toast(e.message); });
+        return;
+      }
       // 저장 직전 재검사
       const fresh = byNo(r.no);
       if (!fresh || cancelBlock(fresh)) { current = fresh; asking = false; render(); return; }
@@ -105,6 +114,12 @@
 
   /* 1) 조회 링크로 들어온 경우 */
   function openToken(t) {
+    if (SERVER) {
+      API.get('/api/reservations/lookup?t=' + encodeURIComponent(t))
+        .then(r => { current = r; proof = { token: t }; asking = false; $('#lk-resend').hidden = true; render(); })
+        .catch(e => { current = null; miss = e.message; render(); });
+      return;
+    }
     const r = BT.byToken(t);
     asking = false;
     if (!r) { current = null; miss = '조회 링크가 올바르지 않아요. 아래에서 이메일로 새 링크를 받아 주세요.'; }
@@ -128,11 +143,40 @@
   /* 3) 예약번호 + 연락처 */
   $('#lk-form').addEventListener('submit', e => {
     e.preventDefault();
+    if (SERVER) {
+      const body = { no: $('#lk-no').value.trim(), phone: $('#lk-phone').value.trim() };
+      API.post('/api/reservations/lookup', body)
+        .then(r => { current = r; proof = { phone: body.phone }; })
+        .catch(err => { current = null; miss = err.message; })
+        .finally(() => { asking = false; render(); card.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+      return;
+    }
     current = find($('#lk-no').value, $('#lk-phone').value); asking = false;
     miss = '예약번호와 연락처가 맞는 예약이 없어요. 다시 확인해 주세요.';
     render();
     card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
-
+  /* 4) 회원으로 로그인했으면 내 예약 목록 (GET /api/member/reservations, 예약.계정_ID 로 조회) */
+  if (SERVER && window.Member && Member.current()) {
+    API.get('/api/member/reservations').then(list => {
+      const sec = document.createElement('section');
+      sec.className = 'card stack'; sec.id = 'my-reservations';
+      const rows = list.map(r => {
+        const st = STATUS[r.status] || STATUS.booked;
+        return `<li class="row" style="justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid #eee">
+          <span><b class="mono">${BT.esc(r.no)}</b><br><small>${BT.fmtDate(r.date)} ${r.time} · ${r.party}명 · ${BT.esc(r.table)}</small></span>
+          <span class="row" style="gap:6px"><span class="badge ${st[1]}">${st[0]}</span>${r.status === 'booked' ? `<button type="button" class="btn btn-ghost" data-open="${BT.esc(r.no)}">보기</button>` : ''}</span></li>`;
+      }).join('');
+      sec.innerHTML = `<h2>${BT.esc(Member.current().name)} 님의 예약</h2>${list.length ? `<ul style="list-style:none;margin:0;padding:0">${rows}</ul>` : '<p class="hint">아직 회원으로 한 예약이 없어요.</p>'}`;
+      const main = document.querySelector('main');
+      const anchor = main.querySelector('.card') || null;
+      main.insertBefore(sec, anchor);
+      sec.addEventListener('click', e => {
+        const b = e.target.closest('[data-open]'); if (!b) return;
+        current = list.find(r => r.no === b.dataset.open); proof = {}; asking = false; render();
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }).catch(() => {});
+  }
 })();
