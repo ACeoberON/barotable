@@ -10,6 +10,7 @@ import com.barotable.store.StoreRepository;
 import com.barotable.store.StoreRule;
 import com.barotable.store.StoreRuleRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
@@ -53,8 +54,8 @@ public class BootController {
 
     @GetMapping(value = "/api/boot.js", produces = "application/javascript;charset=UTF-8")
     @Transactional(readOnly = true)
-    public ResponseEntity<String> boot(@RequestParam(defaultValue = "guest") String scope) throws Exception {
-        boolean owner = "owner".equals(scope);
+    public ResponseEntity<String> boot(@RequestParam(defaultValue = "guest") String scope, HttpSession session) throws Exception {
+        boolean owner = "owner".equals(scope) && session.getAttribute(StaffApiController.SESSION_KEY) != null;
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("store", store());
         out.put("floors", floors());
@@ -152,8 +153,9 @@ public class BootController {
     /** 연락처별 누적 노쇼 횟수 (점주 화면 경고용) */
     private Map<String, Long> noShowHistory() {
         Map<String, Long> m = new TreeMap<>();
+        LocalDate sentFrom = LocalDate.now().minusDays(7);
         for (Reservation r : reservationRepository.findAll())
-            if (r.getStatus() == ReservationStatus.NO_SHOW) m.merge(r.getGuestPhone(), 1L, Long::sum);
+            if (r.getStatus() == ReservationStatus.NO_SHOW && r.getVisitDate().isBefore(sentFrom)) m.merge(r.getGuestPhone(), 1L, Long::sum);
         return m;
     }
 

@@ -44,4 +44,13 @@ public class TableUse {
 
     @Column(length = 200)
     private String memo;
+
+    public static TableUse seat(Reservation reservation, LocalDateTime seatedAt) {
+        TableUse u = new TableUse();
+        u.table = reservation.getTable();
+        u.reservation = reservation;
+        u.party = reservation.getParty();
+        u.seatedAt = seatedAt;
+        return u;
+    }
 }

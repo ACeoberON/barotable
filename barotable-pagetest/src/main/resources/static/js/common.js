@@ -192,8 +192,9 @@ window.BT = (function () {
   /* 오픈 ~ 마감 30분 전까지 30분 단위, 브레이크는 선택 불가 (기본 11:30–21:30, 브레이크 15:00–17:00) */
   function slots() {
     const h = store().hours, out = [];
-    for (let m = toMin(h.open); m < toMin(h.close); m += 30) {
-      const br = m >= toMin(h.breakStart) && m < toMin(h.breakEnd);
+    const dine = store().dineMinutes;
+    for (let m = toMin(h.open); m + dine <= toMin(h.close); m += 30) {
+      const br = m + dine > toMin(h.breakStart) && m < toMin(h.breakEnd);
       out.push({ time: toHHMM(m), break: br, period: m < toMin(h.breakStart) ? 'lunch' : (br ? 'break' : 'dinner') });
     }
     return out;
@@ -202,6 +203,9 @@ window.BT = (function () {
     const h = store().hours, m = toMin(time);
     if (m < toMin(h.open) || m >= toMin(h.close)) return { ok: false, reason: `영업시간(${h.open}–${h.close}) 밖이에요` };
     if (m >= toMin(h.breakStart) && m < toMin(h.breakEnd)) return { ok: false, reason: `${h.breakStart}–${h.breakEnd}은 브레이크 타임이에요` };
+    const dine = store().dineMinutes;
+    if (m + dine > toMin(h.close)) return { ok: false, reason: `마지막 예약은 ${toHHMM(toMin(h.close) - dine)}까지예요` };
+    if (m < toMin(h.breakStart) && m + dine > toMin(h.breakStart)) return { ok: false, reason: `브레이크 전 마지막 예약은 ${toHHMM(toMin(h.breakStart) - dine)}까지예요` };
     return { ok: true };
   }
 
@@ -256,7 +260,7 @@ window.BT = (function () {
     if (/[?&]debug\b/.test(location.search)) showDebug();
     /* 발표용 화면 구성도 패널 (static/js/screen-map.js) */
     const sm = document.createElement('script');
-    sm.src = document.body.dataset.server === 'true' ? '/js/screen-map.js?v=20261025a' : '../'.repeat(Number(document.body.dataset.depth || 0) + 1) + 'static/js/screen-map.js?v=20261025a';
+    sm.src = document.body.dataset.server === 'true' ? '/js/screen-map.js?v=20261115a' : '../'.repeat(Number(document.body.dataset.depth || 0) + 1) + 'static/js/screen-map.js?v=20261115a';
     document.body.appendChild(sm);
     /* 매장 입장 화면의 영업시간 표시도 운영 조건을 따른다 */
     const ho = document.getElementById('h-open'), hb = document.getElementById('h-break'), h = store().hours;

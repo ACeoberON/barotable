@@ -147,7 +147,7 @@
     REQ.forEach(([re, label, pref]) => { if (re.test(raw)) { out.requests.push(label); if (pref) out.prefs.push(pref); } });
     return out;
   }
-  function prevSlot(t) { return BT.toHHMM(BT.toMin(t) - (st.slotMinutes || 30)); }
+  function prevSlot(t) { return BT.toHHMM(BT.toMin(t) - (st.dineMinutes || 90)); }
 
   /* ---------- 2단계: 로컬 LLM (프로토타입: 고정 응답) ----------
    * 실제 구현: 서버가 Ollama 소형 모델에 문장과 빈 항목을 넘기고 { date, time, party } JSON만 받는다.

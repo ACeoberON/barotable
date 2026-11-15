@@ -1,5 +1,7 @@
 package com.barotable.web;
 
+import com.barotable.api.StaffApiController;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
@@ -21,7 +23,12 @@ public class PageController {
     @GetMapping("/member/login")        public String memberLogin() { return "member-login"; }
 
     // 점주, 관리자
-    @GetMapping("/owner/login")     public String ownerLogin()     { return "owner/login"; }
+    @GetMapping("/owner/login")
+    public String ownerLogin(HttpSession session) {
+        session.removeAttribute(StaffApiController.SESSION_KEY);
+        session.removeAttribute(StaffApiController.ROLE_KEY);
+        return "owner/login";
+    }
     @GetMapping("/owner/dashboard") public String ownerDashboard() { return "owner/dashboard"; }
     @GetMapping("/owner/guests")    public String ownerGuests()    { return "owner/guests"; }
     @GetMapping("/owner/schedule")  public String ownerSchedule()  { return "owner/schedule"; }
