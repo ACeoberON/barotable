@@ -35,7 +35,7 @@ public class ReservationApiController {
     public record CreateRequest(
             @NotBlank String table,
             @NotNull LocalDate date,
-            @NotBlank @Pattern(regexp = "\\d{2}:\\d{2}") String time,
+            @NotBlank @Pattern(regexp = "([01]\\d|2[0-3]):(00|30)") String time,
             @Min(1) @Max(20) int party,
             @NotBlank @Size(min = 2, max = 50) String name,
             @NotBlank @Pattern(regexp = "01[016789]-?\\d{3,4}-?\\d{4}") String phone,

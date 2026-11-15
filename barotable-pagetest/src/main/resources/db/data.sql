@@ -2,10 +2,13 @@
 -- INSERT IGNORE: 이미 같은 번호의 행이 있으면 건너뛴다. 서버를 여러 번 켜도 중복되지 않는다.
 
 INSERT IGNORE INTO account (account_id, email, password_hash, name, phone, role, status) VALUES
- (1, 'admin@example.com', '{bcrypt}...', '관리자', NULL, 'ADMIN', 'ACTIVE'),
- (2, 'owner@example.com', '{bcrypt}...', '김점주', '010-1000-0000', 'OWNER', 'ACTIVE'),
+ (1, 'admin@example.com', '$2a$10$iL.IwPQW3eEPTzOxkQoXzu7QEd5uYfkV.H0YNw1bpnZ0viVSs5Peq', '관리자', NULL, 'ADMIN', 'ACTIVE'),
+ (2, 'owner@example.com', '$2a$10$iL.IwPQW3eEPTzOxkQoXzu7QEd5uYfkV.H0YNw1bpnZ0viVSs5Peq', '김점주', '010-1000-0000', 'OWNER', 'ACTIVE'),
  (3, 'owner2@example.com', '{bcrypt}...', '이대표', '010-2000-0000', 'OWNER', 'PENDING'),
  (4, 'minji@example.com', '{bcrypt}...', '김민지', '010-2345-1111', 'CUSTOMER', 'ACTIVE');
+
+UPDATE account SET password_hash = '$2a$10$iL.IwPQW3eEPTzOxkQoXzu7QEd5uYfkV.H0YNw1bpnZ0viVSs5Peq'
+ WHERE email IN ('admin@example.com', 'owner@example.com') AND password_hash = '{bcrypt}...';
 
 INSERT IGNORE INTO store (store_id, owner_account_id, name, address, phone) VALUES
  (1, 2, '바로키친 성수점', '서울 성동구 성수이로 00, 1–2층', '02-000-0000');

@@ -56,9 +56,9 @@ A-01 점주·관리자 로그인 · A-02 서비스 관리자 · O-02 대시보�
 2. `src/main/resources/application-local.yml.example`을 복사해 `application-local.yml`로 이름을 바꾸고 MySQL 비밀번호를 적습니다. (Git에 올라가지 않습니다)
 
 ### 실행
-- 테스트: `./gradlew test` (Windows는 `gradlew.bat test`) → MySQL에 연결해 14개 테스트 (DB 9개 + 화면 API 5개)
-- 서버: `./gradlew bootRun` → http://localhost:8080
-- DB 연결 확인 화면: http://localhost:8080/dev/db (테이블 9개 행 수, 매장·좌석도·예약 조회, 예약 저장, 겹침 검사, 동시 예약 잠금 시연). 서비스 관리자 화면 왼쪽 "바로가기"에도 링크가 있습니다.
+- 테스트: `./gradlew test` (Windows는 `gradlew.bat test`) → MySQL에 연결해 18개 테스트 (DB 9개 + 화면 API 9개)
+- 서버: `./gradlew bootRun` → http://localhost:8080 (bootRun은 개발 모드 `dev` 프로필로 켜집니다)
+- DB 연결 확인 화면: http://localhost:8080/dev/db (테이블 9개 행 수, 매장·좌석도·예약 조회, 예약 저장, 겹침 검사, 동시 예약 잠금 시연). 서비스 관리자 화면 왼쪽 "바로가기"에도 링크가 있습니다. 개발 모드(`dev` 프로필)에서만 열리고, jar로 실행하면 없는 주소(404)입니다.
 - GitHub Pages에서는 서버가 없어서 같은 링크가 `templates/dev/db-snapshot.html`(실제 MySQL 실행 기록)로 열립니다.
 
 ### 패키지
@@ -79,17 +79,20 @@ A-01 점주·관리자 로그인 · A-02 서비스 관리자 · O-02 대시보�
   기존 화면 코드는 그대로 두고 데이터만 DB 값으로 바뀝니다.
 - 시연용 데이터: 서버를 켠 날(오늘)과 5일 뒤 예약이 `data.sql`에서 자동으로 들어갑니다.
 - 시연용 회원: `member@example.com` / `barotable`
+- 시연용 점주: `owner@example.com` / `barotable`, 서비스 관리자: `admin@example.com` / `barotable`
+- 점주·관리자 화면(`/owner/**`, `/admin`)과 점주 API(`/api/owner/**`)는 로그인해야 열립니다. 로그인하지 않으면 화면은 로그인 화면으로 보내고, API는 401을 돌려줍니다.
 
 | 주소 | 하는 일 | 쓰는 화면 |
 |---|---|---|
 | `GET /api/boot.js` | 매장·운영조건·좌석도·예약(빈자리 계산용) | 손님 화면 전체 |
-| `GET /api/boot.js?scope=owner` | 위 + 예약자 이름·연락처·요청사항, 노쇼 횟수 | 점주 화면 |
-| `POST /api/reservations` | 예약 저장 (테이블 행 잠금 → 인원·구역·영업시간·겹침 확인 → 저장, 비회원은 조회 토큰 발급) | C-04 예약 확정 |
+| `GET /api/boot.js?scope=owner` | 위 + 예약자 이름·연락처·요청사항, 노쇼 횟수 (점주 로그인 상태에서만, 아니면 손님용 값) | 점주 화면 |
+| `POST /api/reservations` | 예약 저장 (테이블 행 잠금 → 인원·구역·영업시간·겹침 확인 → 저장, 비회원은 조회 토큰 발급). 시간은 30분 단위, 끝나는 시각이 브레이크·영업 종료를 넘지 않아야 하고, 60일 뒤까지만 받음 | C-04 예약 확정 |
 | `GET /api/reservations/lookup?t=` | 메일 조회 링크(토큰)로 예약 보기 | C-07 |
 | `POST /api/reservations/lookup` | 예약번호 + 연락처로 예약 보기 | C-07 |
 | `POST /api/reservations/{no}/cancel` | 손님 취소 (토큰·연락처·회원 세션으로 본인 확인) | C-07 |
 | `POST /api/member/signup` · `login` · `logout` | 회원가입(BCrypt 해시 저장)·로그인·로그아웃 (서버 세션) | M-01 |
 | `GET /api/member/reservations` | 내 예약 (예약.계정_ID로 조회) | C-07 (로그인 시) |
-| `PATCH /api/owner/reservations/{no}` | 방문·노쇼·취소 처리, 테이블 이동 | O-02, O-05 |
+| `POST /api/staff/login` · `logout` | 점주·서비스 관리자 로그인 (권한 OWNER/ADMIN, 승인된 계정만) | A-01 |
+| `PATCH /api/owner/reservations/{no}` | 방문·노쇼·취소 처리, 테이블 이동. 방문 처리하면 테이블이용(착석 기록)이 생기고, 노쇼·취소를 되돌릴 때는 겹침을 다시 확인 | O-02, O-05 |
 
-아직 DB에 저장하지 않는 것: 좌석도 편집(O-03), 운영 조건(O-04), 워크인 접수, 점주·관리자 로그인과 권한 검사, 서비스 관리자 화면
+아직 DB에 저장하지 않는 것: 좌석도 편집(O-03), 운영 조건(O-04), 워크인 접수, 서비스 관리자 화면의 승인 처리

@@ -1,6 +1,7 @@
 package com.barotable.devcheck;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -11,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 
 /** DB 연결 확인 화면: JPA로 MySQL을 실제로 읽고 쓰는 것을 보여 준다 (발표·시연용) */
+@Profile("dev")
 @Controller
 @RequestMapping("/dev/db")
 @RequiredArgsConstructor

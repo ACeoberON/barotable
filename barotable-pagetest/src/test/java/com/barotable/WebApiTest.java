@@ -35,8 +35,15 @@ class WebApiTest {
 
     @AfterEach
     void cleanUp() {
+        jdbc.update("delete from table_use where reservation_id in (select reservation_id from reservation where visit_date = ?)", DAY);
         jdbc.update("delete from reservation where visit_date = ?", DAY);
         jdbc.update("delete from account where email = ?", SIGNUP_EMAIL);
+    }
+
+    private MockHttpSession staff(String email) throws Exception {
+        return (MockHttpSession) mvc.perform(post("/api/staff/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"barotable\"}"))
+                .andExpect(status().isOk()).andReturn().getRequest().getSession(false);
     }
 
     private String booking(String table, String time, int party) {
@@ -47,7 +54,7 @@ class WebApiTest {
 
     @Test
     void 화면_첫_데이터는_DB_좌석도와_예약을_담는다() throws Exception {
-        String js = mvc.perform(get("/api/boot.js?scope=owner")).andExpect(status().isOk())
+        String js = mvc.perform(get("/api/boot.js?scope=owner").session(staff("owner@example.com"))).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         assertThat(js).startsWith("window.BT_DB = ");
         JsonNode db = om.readTree(js.substring("window.BT_DB = ".length(), js.lastIndexOf(';')));
@@ -56,6 +63,8 @@ class WebApiTest {
         // 손님 화면용에는 예약자 연락처가 비어 있다
         String guest = mvc.perform(get("/api/boot.js")).andReturn().getResponse().getContentAsString();
         assertThat(guest).doesNotContain("010-2345-1111");
+        String noLogin = mvc.perform(get("/api/boot.js?scope=owner")).andReturn().getResponse().getContentAsString();
+        assertThat(noLogin).doesNotContain("010-2345-1111");
     }
 
     @Test
@@ -146,18 +155,93 @@ class WebApiTest {
 
     @Test
     void 점주_상태변경과_테이블이동() throws Exception {
+        MockHttpSession owner = staff("owner@example.com");
         String a = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:00", 4)))
                 .andReturn().getResponse().getContentAsString()).get("no").asText();
         mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T07", "18:30", 4)))
                 .andExpect(status().isOk());
 
         // T07은 18:30 예약과 겹쳐서 이동 거절, T08(6인석)은 허용
-        mvc.perform(patch("/api/owner/reservations/" + a).contentType(MediaType.APPLICATION_JSON).content("{\"table\":\"T07\"}"))
+        mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"table\":\"T07\"}"))
                 .andExpect(status().isConflict());
-        mvc.perform(patch("/api/owner/reservations/" + a).contentType(MediaType.APPLICATION_JSON).content("{\"table\":\"T08\"}"))
+        mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"table\":\"T08\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.table").value("T08"));
-        mvc.perform(patch("/api/owner/reservations/" + a).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"noshow\"}"))
+        mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"noshow\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("noshow"));
         assertThat(jdbc.queryForObject("select status from reservation where reservation_no = ?", String.class, a)).isEqualTo("NO_SHOW");
+    }
+
+    @Test
+    void 점주_API와_화면은_로그인해야_열린다() throws Exception {
+        mvc.perform(patch("/api/owner/reservations/BT-X").contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"visited\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/owner/dashboard")).andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/owner/login"));
+        mvc.perform(get("/admin")).andExpect(status().is3xxRedirection());
+        mvc.perform(post("/api/staff/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"owner@example.com\",\"password\":\"wrong\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/staff/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"member@example.com\",\"password\":\"barotable\"}"))
+                .andExpect(status().isUnauthorized());
+
+        MockHttpSession owner = staff("owner@example.com");
+        mvc.perform(get("/owner/dashboard").session(owner)).andExpect(status().isOk());
+        mvc.perform(get("/admin").session(owner)).andExpect(status().is3xxRedirection());
+        mvc.perform(get("/admin").session(staff("admin@example.com"))).andExpect(status().isOk());
+        mvc.perform(get("/dev/db")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 잘못된_시간과_너무_먼_날짜는_거절() throws Exception {
+        mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T03", "25:00", 2)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T03", "19:07", 2)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T03", "21:00", 2)))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("20:30")));
+        mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T03", "14:00", 2)))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("13:30")));
+        mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T03", "13:30", 2)))
+                .andExpect(status().isOk());
+        String far = booking("T03", "19:00", 2).replace(DAY.toString(), LocalDate.now().plusDays(61).toString());
+        mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(far))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("60일")));
+    }
+
+    @Test
+    void 노쇼_자리에_새_예약이_들어오면_되돌릴_수_없다() throws Exception {
+        MockHttpSession owner = staff("owner@example.com");
+        String a = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:00", 4)))
+                .andReturn().getResponse().getContentAsString()).get("no").asText();
+        mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"noshow\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"booked\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"noshow\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:30", 4)))
+                .andExpect(status().isOk());
+        mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"booked\"}"))
+                .andExpect(status().isConflict());
+        assertThat(jdbc.queryForObject("select status from reservation where reservation_no = ?", String.class, a)).isEqualTo("NO_SHOW");
+    }
+
+    @Test
+    void 방문_처리하면_착석_기록이_생기고_되돌리면_지워진다() throws Exception {
+        MockHttpSession owner = staff("owner@example.com");
+        String a = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T05", "19:00", 2)))
+                .andReturn().getResponse().getContentAsString()).get("no").asText();
+        String countSql = "select count(*) from table_use u join reservation r on r.reservation_id = u.reservation_id where r.reservation_no = ?";
+
+        mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"visited\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"visited\"}"))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(countSql, Integer.class, a)).isEqualTo(1);
+
+        mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"booked\"}"))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(countSql, Integer.class, a)).isEqualTo(0);
     }
 }

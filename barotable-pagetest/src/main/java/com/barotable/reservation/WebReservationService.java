@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Optional;
 
 /**
  * 손님 화면(예약하기, 조회, 취소)과 점주 화면(상태 변경, 테이블 이동)에서 쓰는 예약 처리.
@@ -26,11 +27,13 @@ import java.time.format.DateTimeFormatter;
 public class WebReservationService {
 
     public static final long STORE_ID = 1L;   // 지금은 매장 1곳(바로키친 성수점)
+    public static final int BOOKING_DAYS = 60;
 
     private final DiningTableRepository tableRepository;
     private final StoreRuleRepository ruleRepository;
     private final ReservationRepository reservationRepository;
     private final AccountRepository accountRepository;
+    private final TableUseRepository tableUseRepository;
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final String TOKEN_CHARS = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -68,11 +71,17 @@ public class WebReservationService {
             throw new IllegalStateException("영업시간(" + rule.getOpenTime() + "–" + rule.getCloseTime() + ") 밖이에요");
         if (rule.getBreakStart() != null && !t.isBefore(rule.getBreakStart()) && t.isBefore(rule.getBreakEnd()))
             throw new IllegalStateException(rule.getBreakStart() + "–" + rule.getBreakEnd() + "은 브레이크 타임이에요");
+        LocalTime end = t.plusMinutes(rule.getDineMinutes());
+        if (end.isAfter(rule.getCloseTime()) || end.isBefore(t))
+            throw new IllegalStateException("마지막 예약은 " + rule.getCloseTime().minusMinutes(rule.getDineMinutes()) + "까지예요");
+        if (rule.getBreakStart() != null && t.isBefore(rule.getBreakStart()) && end.isAfter(rule.getBreakStart()))
+            throw new IllegalStateException("브레이크 전 마지막 예약은 " + rule.getBreakStart().minusMinutes(rule.getDineMinutes()) + "까지예요");
         if (LocalDateTime.of(b.date(), t).isBefore(LocalDateTime.now()))
             throw new IllegalStateException("이미 지난 시간이에요");
+        if (b.date().isAfter(LocalDate.now().plusDays(BOOKING_DAYS)))
+            throw new IllegalStateException("예약은 " + BOOKING_DAYS + "일 뒤까지만 받아요");
 
         // ③ 겹침 확인 (잠금을 잡은 뒤라 다른 요청이 끼어들 수 없다)
-        LocalTime end = t.plusMinutes(rule.getDineMinutes());
         if (reservationRepository.countOverlaps(table.getId(), b.date(), t, end) > 0)
             throw new IllegalStateException("이미 예약된 시간입니다. 다른 시간이나 테이블을 골라 주세요");
 
@@ -95,7 +104,19 @@ public class WebReservationService {
     public Reservation changeStatus(String no, ReservationStatus status) {
         Reservation r = reservationRepository.findByReservationNo(no)
                 .orElseThrow(() -> new IllegalArgumentException("없는 예약입니다: " + no));
+        boolean wasActive = r.getStatus() == ReservationStatus.BOOKED || r.getStatus() == ReservationStatus.VISITED;
+        boolean willBeActive = status == ReservationStatus.BOOKED || status == ReservationStatus.VISITED;
+        if (!wasActive && willBeActive) {
+            tableRepository.findByIdForUpdate(r.getTable().getId()).orElseThrow();
+            if (reservationRepository.countOverlapsExcept(r.getTable().getId(), r.getVisitDate(), r.getStartTime(), r.getEndTime(), r.getId()) > 0)
+                throw new IllegalStateException("그 사이 이 자리에 다른 예약이 들어와서 되돌릴 수 없어요");
+        }
         r.changeStatus(status);
+        Optional<TableUse> use = tableUseRepository.findByReservationId(r.getId());
+        if (status == ReservationStatus.VISITED && use.isEmpty())
+            tableUseRepository.save(TableUse.seat(r, LocalDateTime.now()));
+        if (status != ReservationStatus.VISITED && use.isPresent())
+            tableUseRepository.delete(use.get());
         return r;
     }
 

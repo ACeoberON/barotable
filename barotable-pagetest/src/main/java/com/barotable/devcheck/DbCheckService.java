@@ -8,6 +8,7 @@ import com.barotable.store.StoreRepository;
 import com.barotable.store.StoreRule;
 import com.barotable.store.StoreRuleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import java.util.concurrent.*;
  * DB 확인 화면(/dev/db)에 보여 줄 값을 JPA Repository 로 읽어 온다.
  * 화면에서 지연 로딩 오류가 나지 않도록, 트랜잭션 안에서 필요한 값만 꺼내 record 로 넘긴다.
  */
+@Profile("dev")
 @Service
 @RequiredArgsConstructor
 public class DbCheckService {
