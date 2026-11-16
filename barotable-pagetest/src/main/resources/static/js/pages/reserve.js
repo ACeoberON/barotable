@@ -151,7 +151,7 @@
         const c = check(t, S.party);
         if (!c) return { cls: 'available', sub: '예약 가능', title: '선택 가능' };
         /* 막힌 이유에 맞는 표시: 예약 겹침 / 인원·구역 조건 / 시간 / 한도 */
-        const LOOK = { reserved: ['reserved', '예약 완료'], full: ['reserved', '예약 마감'], rule: ['small', '조건 불가'], time: ['small', '시간 불가'] };
+        const LOOK = { reserved: ['reserved', '예약 완료'], full: ['reserved', '예약 완료'], rule: ['small', '인원 불가'], time: ['small', '선택 불가'] };
         const [cls, sub] = LOOK[c.kind];
         return { cls, sub, title: c.reason };
       },
