@@ -47,6 +47,7 @@
 <input autocomplete="current-password" class="input" id="lg-pw" name="password" placeholder="비밀번호" type="password"/>
 </div>
 <a class="btn btn-indigo" data-go="owner-dashboard" href="../owner/dashboard.html" id="lg-go" th:href="@{/owner/dashboard}">로그인</a>
+<a class="btn btn-ghost" data-go="owner-signup" href="../owner/signup.html" th:href="@{/owner/signup}" style="display:inline-flex;justify-content:center;margin-top:10px;width:100%">점주 회원가입</a>
 <p class="hint" id="lg-hint">점주 계정은 서비스 관리자가 승인한 뒤 쓸 수 있어요.</p>
 </section>
 </div>
@@ -73,7 +74,7 @@
         e.preventDefault(); e.stopPropagation();
         const hint = document.getElementById('lg-hint');
         API.post('/api/staff/login', { email: document.getElementById('lg-email').value, password: document.getElementById('lg-pw').value })
-          .then(me => BT.go(me.role === 'ADMIN' ? 'admin' : 'owner-dashboard'))
+          .then(me => BT.go(me.role === 'ADMIN' ? 'admin' : sessionStorage.getItem('baro-owner-onboarding') === 'layout' ? 'owner-editor' : 'owner-dashboard'))
           .catch(err => { hint.textContent = err.message; hint.classList.add('bad'); });
       });
       document.getElementById('lg-pw').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('lg-go').click(); });

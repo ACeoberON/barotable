@@ -41,6 +41,10 @@ window.BT = (function () {
     'owner-login': ['owner/login.html', '/owner/login'], 'owner-dashboard': ['owner/dashboard.html', '/owner/dashboard'],
     'owner-editor': ['owner/editor.html', '/owner/seat-map'], 'owner-settings': ['owner/settings.html', '/owner/settings'],
     'owner-guests': ['owner/guests.html', '/owner/guests'], 'owner-schedule': ['owner/schedule.html', '/owner/schedule'],
+    'owner-signup': ['owner/signup.html', '/owner/signup'],
+    'owner-onboarding-welcome': ['owner/onboarding-welcome.html', '/owner/onboarding/welcome'],
+    'owner-onboarding-holidays': ['owner/onboarding-holidays.html', '/owner/onboarding/holidays'],
+    'owner-onboarding-preview': ['owner/onboarding-preview.html', '/owner/onboarding/preview'],
     'dev-db': ['dev/db-snapshot.html', '/dev/db']  /* 서버: 실시간 DB 확인, GitHub Pages: 실행 기록 */
   };
   function url(name) {
@@ -246,7 +250,7 @@ window.BT = (function () {
   /* ---------- 화면 목록 바 ---------- */
   const SCREENS = [
     ['index', 'C-01', '매장 입장'], ['reserve', 'C-03', '좌석도 선택 · AI 채팅'], ['confirm', 'C-04/05', '정보·확인'],
-    ['complete', 'C-06', '예약 완료'], ['lookup', 'C-07', '비회원 조회'], ['owner-login', 'A-01', '점주·관리자 로그인'],
+    ['complete', 'C-06', '예약 완료'], ['lookup', 'C-07', '비회원 조회'], ['owner-login', 'A-01', '점주·관리자 로그인'], ['owner-signup', 'A-01-1', '점주 회원가입'],
     ['owner-dashboard', 'O-02', '점주 대시보드'], ['owner-guests', 'O-05', '손님 배정'], ['owner-editor', 'O-03', '좌석도 편집'], ['owner-settings', 'O-04', '운영 조건']
   ];
   SCREENS.push(['admin', 'A-02', '서비스 관리자']);
