@@ -41,7 +41,11 @@ window.BT = (function () {
     'owner-login': ['owner/login.html', '/owner/login'], 'owner-dashboard': ['owner/dashboard.html', '/owner/dashboard'],
     'owner-editor': ['owner/editor.html', '/owner/seat-map'], 'owner-settings': ['owner/settings.html', '/owner/settings'],
     'owner-guests': ['owner/guests.html', '/owner/guests'], 'owner-schedule': ['owner/schedule.html', '/owner/schedule'],
-    'dev-db': ['dev/db-snapshot.html', '/dev/db']  /* 서버: 실시간 DB 확인, GitHub Pages: 실행 기록 */
+    'owner-signup': ['owner/signup.html', '/owner/signup'],
+    'owner-onboarding-welcome': ['owner/onboarding-welcome.html', '/owner/onboarding/welcome'],
+    'owner-onboarding-holidays': ['owner/onboarding-holidays.html', '/owner/onboarding/holidays'],
+    'owner-onboarding-preview': ['owner/onboarding-preview.html', '/owner/onboarding/preview'],
+    'dev-db': ['dev/db-snapshot.html', '/dev/db']  /* 서버: 실시간 DB 확인, GitHub Pages: 실행 기록 (화면 메뉴에는 없음) */
   };
   function url(name) {
     const r = ROUTES[name];
@@ -148,10 +152,20 @@ window.BT = (function () {
   }
   /* 손님 좌석도 · 예약 확정 · 점주 배정이 함께 쓰는 판정.
    * 문제가 있으면 { kind, reason }, 앉을 수 있으면 null
-   *   kind: time(지난 시간 · 영업시간 밖 · 브레이크) | rule(좌석 수 · 단체석 · 구역 인원) | reserved(이용 시간 겹침) | full(시간대 한도) */
+   *   kind: time(지난 시간 · 휴무일 · 영업시간 밖 · 브레이크) | rule(좌석 수 · 단체석 · 구역 인원) | reserved(이용 시간 겹침) | full(시간대 한도) */
+  function holiday(date) {
+    const h = sget('baro-holidays', { weekly: [], dates: [] });
+    const d = (h.dates || []).find(x => x.date === date);
+    if (d) return d.reason ? `휴무일이에요 (${d.reason})` : '휴무일이에요';
+    const dow = parseDate(date).getDay();
+    if ((h.weekly || []).includes(dow)) return `매주 ${WEEK[dow]}요일은 쉬는 날이에요`;
+    return null;
+  }
   function checkSeat(t, c, list, fl, except) {
     if (!t) return { kind: 'rule', reason: '테이블을 찾을 수 없어요' };
     if (c.date < TODAY || (c.date === TODAY && toMin(c.time) <= toMin(NOW))) return { kind: 'time', reason: '이미 지난 시간이에요' };
+    const off = holiday(c.date);
+    if (off) return { kind: 'time', reason: off };
     const tc = timeCheck(c.time);
     if (!tc.ok) return { kind: 'time', reason: tc.reason };
     const rule = seatRule(t, c.party, fl);
@@ -246,11 +260,10 @@ window.BT = (function () {
   /* ---------- 화면 목록 바 ---------- */
   const SCREENS = [
     ['index', 'C-01', '매장 입장'], ['reserve', 'C-03', '좌석도 선택 · AI 채팅'], ['confirm', 'C-04/05', '정보·확인'],
-    ['complete', 'C-06', '예약 완료'], ['lookup', 'C-07', '비회원 조회'], ['owner-login', 'A-01', '점주·관리자 로그인'],
+    ['complete', 'C-06', '예약 완료'], ['lookup', 'C-07', '비회원 조회'], ['owner-login', 'A-01', '점주·관리자 로그인'], ['owner-signup', 'A-01-1', '점주 회원가입'],
     ['owner-dashboard', 'O-02', '점주 대시보드'], ['owner-guests', 'O-05', '손님 배정'], ['owner-editor', 'O-03', '좌석도 편집'], ['owner-settings', 'O-04', '운영 조건']
   ];
   SCREENS.push(['admin', 'A-02', '서비스 관리자']);
-  SCREENS.push(['dev-db', 'DEV', document.body.dataset.server === 'true' ? 'DB 연결 확인 (JPA · MySQL)' : 'DB 연결 확인 (실행 기록)']);
   document.addEventListener('DOMContentLoaded', () => {
     const cur = document.body.dataset.screen;
     const bar = document.createElement('div'); bar.className = 'proto-bar';
@@ -260,7 +273,7 @@ window.BT = (function () {
     if (/[?&]debug\b/.test(location.search)) showDebug();
     /* 발표용 화면 구성도 패널 (static/js/screen-map.js) */
     const sm = document.createElement('script');
-    sm.src = document.body.dataset.server === 'true' ? '/js/screen-map.js?v=20261115a' : '../'.repeat(Number(document.body.dataset.depth || 0) + 1) + 'static/js/screen-map.js?v=20261115a';
+    sm.src = document.body.dataset.server === 'true' ? '/js/screen-map.js?v=20261116a' : '../'.repeat(Number(document.body.dataset.depth || 0) + 1) + 'static/js/screen-map.js?v=20261116a';
     document.body.appendChild(sm);
     /* 매장 입장 화면의 영업시간 표시도 운영 조건을 따른다 */
     const ho = document.getElementById('h-open'), hb = document.getElementById('h-break'), h = store().hours;
@@ -274,5 +287,5 @@ window.BT = (function () {
   });
 
   return { YEAR, MONTH, TODAY, NOW, store, saveStore, resetStore, floors, allTables, findTable, zoneOf, url, go, draft, saveDraft,
-    guestNo, newGuestNo, reservations, updateReservation, addReservation, removeReservation, resetReservations, isActive, tokenOf, byToken, tokenExpired, lookupUrl, seatRule, tableClash, slotFull, checkSeat, sget, sset, sremove, pad, toMin, toHHMM, parseDate, iso, fmtDate, octoberDays, slots, timeCheck, esc, toast };
+    guestNo, newGuestNo, reservations, updateReservation, addReservation, removeReservation, resetReservations, isActive, tokenOf, byToken, tokenExpired, lookupUrl, seatRule, tableClash, slotFull, holiday, checkSeat, sget, sset, sremove, pad, toMin, toHHMM, parseDate, iso, fmtDate, octoberDays, slots, timeCheck, esc, toast };
 })();

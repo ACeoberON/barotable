@@ -29,6 +29,10 @@ public class PageController {
         session.removeAttribute(StaffApiController.ROLE_KEY);
         return "owner/login";
     }
+    @GetMapping("/owner/signup")              public String ownerSignup()            { return "owner/signup"; }
+    @GetMapping("/owner/onboarding/welcome")  public String ownerOnboardingWelcome() { return "owner/onboarding-welcome"; }
+    @GetMapping("/owner/onboarding/holidays") public String ownerOnboardingHolidays(){ return "owner/onboarding-holidays"; }
+    @GetMapping("/owner/onboarding/preview")  public String ownerOnboardingPreview() { return "owner/onboarding-preview"; }
     @GetMapping("/owner/dashboard") public String ownerDashboard() { return "owner/dashboard"; }
     @GetMapping("/owner/guests")    public String ownerGuests()    { return "owner/guests"; }
     @GetMapping("/owner/schedule")  public String ownerSchedule()  { return "owner/schedule"; }

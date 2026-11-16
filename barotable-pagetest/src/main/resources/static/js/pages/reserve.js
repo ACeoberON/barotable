@@ -54,7 +54,7 @@
     if (d) d.textContent = BT.fmtDate(S.date, 'long');
     if (p) p.textContent = `${S.party}명 · ${S.time || '시간 미선택'}`;
     const confirm = $('#sheet-confirm');
-    if (confirm) confirm.disabled = !S.time || isPast(S.time) || !BT.timeCheck(S.time).ok || !BT.slots().some(x => x.time === S.time && !x.break);
+    if (confirm) confirm.disabled = !S.time || !!BT.holiday(S.date) || isPast(S.time) || !BT.timeCheck(S.time).ok || !BT.slots().some(x => x.time === S.time && !x.break);
   }
   function renderDates() {
     const box = $('#date-strip');
@@ -68,11 +68,11 @@
     const currentDays = Array.from({length: count}, (_, i) => {
       const day = i + 1, date = new Date(viewYear, viewMonth - 1, day);
       const iso = `${viewYear}-${BT.pad(viewMonth)}-${BT.pad(day)}`;
-      return {iso, day, dow: date.getDay(), week: ['일','월','화','수','목','금','토'][date.getDay()], past: iso < BT.TODAY, today: iso === BT.TODAY};
+      return {iso, day, dow: date.getDay(), week: ['일','월','화','수','목','금','토'][date.getDay()], past: iso < BT.TODAY, off: !!BT.holiday(iso), today: iso === BT.TODAY};
     });
     box.innerHTML = Array.from({length: offset}, () => '<span class="calendar-empty" aria-hidden="true"></span>').join('') + currentDays.map(x => `
       <button type="button" class="calendar-day ${x.dow === 0 ? 'sun' : ''} ${x.dow === 6 ? 'sat' : ''} ${x.iso === S.date ? 'on' : ''}"
-       data-date="${x.iso}" ${x.past ? 'disabled' : ''} aria-pressed="${x.iso === S.date}" aria-label="${viewMonth}월 ${x.day}일 ${x.week}요일${x.past ? ', 지난 날짜' : ''}">
+       data-date="${x.iso}" ${x.past || x.off ? 'disabled' : ''} aria-pressed="${x.iso === S.date}" aria-label="${viewMonth}월 ${x.day}일 ${x.week}요일${x.past ? ', 지난 날짜' : x.off ? ', 휴무일' : ''}">
        <span>${x.day}</span>${x.today ? '<small>오늘</small>' : ''}</button>`).join('');
     box.querySelectorAll('button:not([disabled])').forEach(b => b.addEventListener('click', () => {
       S.date = b.dataset.date;
@@ -97,7 +97,7 @@
       S.party=Number(b.dataset.party); S.selected=null;renderParty();renderMap();renderPanel();sheetSummary();
     }));
     const pv = $('#p-val'); if(pv) pv.textContent = S.party+'명';
-    const ph=$('#p-hint'); if(ph) ph.textContent = `${st.minParty}–${st.maxParty}명`;
+    const ph=$('#p-hint'); if(ph) ph.textContent = `${st.minParty}–${st.maxParty}명 · 좌우로 스크롤`;
     const rb=$('#req-badge'); if(rb){rb.hidden=!S.request;rb.textContent=S.request?S.request:'';}
   }
   $('#p-minus').addEventListener('click',()=>{S.party=Math.max(st.minParty,S.party-1);renderParty();renderMap();renderPanel();});
@@ -106,6 +106,7 @@
     const sl=BT.slots().filter(x=>!x.break);
     const h=BT.store().hours;
     const label=$('#hours-small');if(label)label.textContent=`${h.open}–${h.close}`;
+    const keep=[...document.querySelectorAll('#time-groups .sheet-time-scroll')].map(el=>el.scrollLeft);
     const groups=[['lunch','점심'],['dinner','저녁']];
     $('#time-groups').innerHTML=groups.map(([key,name])=>{
       const times=sl.filter(x=>x.period===key && !isPast(x.time));
@@ -116,6 +117,7 @@
            return `<button class="sheet-choice sheet-time-choice ${x.time===S.time?'active':''}" type="button" data-time="${x.time}" ${disabled?'disabled':''} aria-pressed="${x.time===S.time}" aria-label="${name} ${x.time}${disabled?' 지난 시간':''}">${x.time}</button>`;
         }).join('')}</div></div>`;
     }).join('');
+    document.querySelectorAll('#time-groups .sheet-time-scroll').forEach((el,i)=>{el.scrollLeft=keep[i]||0;});
     $('#time-groups').querySelectorAll('button[data-time]:not([disabled])').forEach(b=>b.addEventListener('click',()=>{
       S.time=b.dataset.time; S.selected=null;
       const v=BT.timeCheck(S.time);
@@ -149,7 +151,7 @@
         const c = check(t, S.party);
         if (!c) return { cls: 'available', sub: '예약 가능', title: '선택 가능' };
         /* 막힌 이유에 맞는 표시: 예약 겹침 / 인원·구역 조건 / 시간 / 한도 */
-        const LOOK = { reserved: ['reserved', '예약 완료'], full: ['reserved', '예약 마감'], rule: ['small', '조건 불가'], time: ['small', '시간 불가'] };
+        const LOOK = { reserved: ['reserved', '예약 완료'], full: ['reserved', '예약 완료'], rule: ['small', '인원 불가'], time: ['small', '선택 불가'] };
         const [cls, sub] = LOOK[c.kind];
         return { cls, sub, title: c.reason };
       },

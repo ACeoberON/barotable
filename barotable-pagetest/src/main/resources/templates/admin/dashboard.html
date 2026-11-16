@@ -6,10 +6,10 @@
   <title>바로테이블 · 서비스 관리자</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap">
-  <link rel="stylesheet" href="../../static/css/app.css?v=20261115a" th:href="@{/css/app.css}">
-  <link rel="stylesheet" href="../../static/css/responsive.css?v=20261115a" th:href="@{/css/responsive.css}">
-  <link rel="stylesheet" href="../../static/css/ui.css?v=20261115a" th:href="@{/css/ui.css}">
-  <link rel="stylesheet" href="../../static/css/owner.css?v=20261115a" th:href="@{/css/owner.css}">
+  <link rel="stylesheet" href="../../static/css/app.css?v=20261116a" th:href="@{/css/app.css}">
+  <link rel="stylesheet" href="../../static/css/responsive.css?v=20261116a" th:href="@{/css/responsive.css}">
+  <link rel="stylesheet" href="../../static/css/ui.css?v=20261116a" th:href="@{/css/ui.css}">
+  <link rel="stylesheet" href="../../static/css/owner.css?v=20261116a" th:href="@{/css/owner.css}">
 </head>
 <!-- A-02 서비스 관리자 (점주 계정 승인 · 서비스 상태) -->
 <body data-depth="1" data-screen="admin" th:data-server="true">
@@ -27,7 +27,7 @@
 <a data-admin-target="services" href="#services"><span aria-hidden="true" class="admin-nav-icon"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l3 3 5-6"></path></svg></span>서비스 상태</a>
 <a data-admin-target="activity" href="#activity"><span aria-hidden="true" class="admin-nav-icon"><svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" viewbox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg></span>활동 기록</a>
 </nav>
-<div class="side-bottom"><div class="side-section-title">바로가기</div><a class="side-shortcut" data-go="dev-db" href="../dev/db-snapshot.html" th:href="@{/dev/db}">▦ &nbsp; DB 연결 확인</a><a class="side-shortcut" data-go="index" href="../index.html" th:href="@{/}">↗   매장 홈</a><a class="side-shortcut" data-go="owner-login" href="../owner/login.html" th:href="@{/owner/login}">↩   로그아웃</a><div class="side-who">서비스 관리자</div></div>
+<div class="side-bottom"><div class="side-section-title">바로가기</div><a class="side-shortcut" data-go="index" href="../index.html" th:href="@{/}">↗   매장 홈</a><a class="side-shortcut" data-go="owner-login" href="../owner/login.html" th:href="@{/owner/login}">↩   로그아웃</a><div class="side-who">서비스 관리자</div></div>
 </aside>
 <main class="owner-main admin-main">
 <div class="admin-page-heading" id="overview">
@@ -64,12 +64,12 @@
 </div>
 <div aria-live="polite" id="admin-dialog-root"></div>
 
-  <script src="../../static/js/data.js?v=20261115a" th:src="@{/js/data.js}"></script>
+  <script src="../../static/js/data.js?v=20261116a" th:src="@{/js/data.js}"></script>
   <!-- 서버에서 열면 DB 값(매장·좌석도·예약)을 받아 하드코딩 데이터를 바꿔 끼운다. GitHub Pages에서는 src가 없어 건너뜀 -->
   <script th:src="@{/api/boot.js}"></script>
-  <script src="../../static/js/db-sync.js?v=20261115a" th:src="@{/js/db-sync.js}"></script>
-  <script src="../../static/js/common.js?v=20261115a" th:src="@{/js/common.js}"></script>
-  <script src="../../static/js/pages/admin.js?v=20261115a" th:src="@{/js/pages/admin.js}"></script>
-  <script src="../../static/js/drag-scroll.js?v=20261115a" th:src="@{/js/drag-scroll.js}"></script>
+  <script src="../../static/js/db-sync.js?v=20261116a" th:src="@{/js/db-sync.js}"></script>
+  <script src="../../static/js/common.js?v=20261116a" th:src="@{/js/common.js}"></script>
+  <script src="../../static/js/pages/admin.js?v=20261116a" th:src="@{/js/pages/admin.js}"></script>
+  <script src="../../static/js/drag-scroll.js?v=20261116a" th:src="@{/js/drag-scroll.js}"></script>
 </body>
 </html>
