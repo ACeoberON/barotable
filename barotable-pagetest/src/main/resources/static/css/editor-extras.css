@@ -1,0 +1,7 @@
+/* HTML UI: 좌석도 편집 - 구역·테이블 겹침 순서 */
+.map-canvas .map-zone{z-index:0!important;pointer-events:auto;}
+.map-canvas .map-zone .zone-label{pointer-events:none;}
+.map-canvas .map-fixture,.map-canvas .fx-item{z-index:2;}
+.map-canvas .map-table{z-index:3!important;position:absolute;}
+.map-canvas .map-table .table-chair{z-index:0;}
+.map-canvas .map-zone.ed-sel{z-index:1!important;}
