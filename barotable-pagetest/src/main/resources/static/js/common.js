@@ -45,7 +45,7 @@ window.BT = (function () {
     'owner-onboarding-welcome': ['owner/onboarding-welcome.html', '/owner/onboarding/welcome'],
     'owner-onboarding-holidays': ['owner/onboarding-holidays.html', '/owner/onboarding/holidays'],
     'owner-onboarding-preview': ['owner/onboarding-preview.html', '/owner/onboarding/preview'],
-    'dev-db': ['dev/db-snapshot.html', '/dev/db']  /* 서버: 실시간 DB 확인, GitHub Pages: 실행 기록 */
+    'dev-db': ['dev/db-snapshot.html', '/dev/db']  /* 서버: 실시간 DB 확인, GitHub Pages: 실행 기록 (화면 메뉴에는 없음) */
   };
   function url(name) {
     const r = ROUTES[name];
@@ -264,7 +264,6 @@ window.BT = (function () {
     ['owner-dashboard', 'O-02', '점주 대시보드'], ['owner-guests', 'O-05', '손님 배정'], ['owner-editor', 'O-03', '좌석도 편집'], ['owner-settings', 'O-04', '운영 조건']
   ];
   SCREENS.push(['admin', 'A-02', '서비스 관리자']);
-  SCREENS.push(['dev-db', 'DEV', document.body.dataset.server === 'true' ? 'DB 연결 확인 (JPA · MySQL)' : 'DB 연결 확인 (실행 기록)']);
   document.addEventListener('DOMContentLoaded', () => {
     const cur = document.body.dataset.screen;
     const bar = document.createElement('div'); bar.className = 'proto-bar';
