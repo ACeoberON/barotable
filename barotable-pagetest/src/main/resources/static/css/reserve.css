@@ -149,8 +149,8 @@ body[data-screen="reserve"]::-webkit-scrollbar { display: none !important; }
 .booking-bottom-sheet #party-strip,
 .booking-bottom-sheet .sheet-time-scroll {
   display: flex !important; flex-wrap: nowrap !important; gap: 8px; min-width: 0 !important;
-  position: relative; width: 100% !important; max-width: 100% !important; overflow: hidden !important;
-  scroll-snap-type: none !important; touch-action: pan-y !important; cursor: grab;
+  position: relative; width: 100% !important; max-width: 100% !important; overflow-x: auto !important; overflow-y: hidden !important;
+  scroll-snap-type: none !important; touch-action: pan-x pan-y !important; cursor: grab;
   scrollbar-width: none !important; user-select: none; -webkit-user-select: none;
 }
 .booking-bottom-sheet #party-strip::-webkit-scrollbar,

@@ -97,7 +97,7 @@
       S.party=Number(b.dataset.party); S.selected=null;renderParty();renderMap();renderPanel();sheetSummary();
     }));
     const pv = $('#p-val'); if(pv) pv.textContent = S.party+'명';
-    const ph=$('#p-hint'); if(ph) ph.textContent = `${st.minParty}–${st.maxParty}명`;
+    const ph=$('#p-hint'); if(ph) ph.textContent = `${st.minParty}–${st.maxParty}명 · 좌우로 스크롤`;
     const rb=$('#req-badge'); if(rb){rb.hidden=!S.request;rb.textContent=S.request?S.request:'';}
   }
   $('#p-minus').addEventListener('click',()=>{S.party=Math.max(st.minParty,S.party-1);renderParty();renderMap();renderPanel();});
@@ -106,6 +106,7 @@
     const sl=BT.slots().filter(x=>!x.break);
     const h=BT.store().hours;
     const label=$('#hours-small');if(label)label.textContent=`${h.open}–${h.close}`;
+    const keep=[...document.querySelectorAll('#time-groups .sheet-time-scroll')].map(el=>el.scrollLeft);
     const groups=[['lunch','점심'],['dinner','저녁']];
     $('#time-groups').innerHTML=groups.map(([key,name])=>{
       const times=sl.filter(x=>x.period===key && !isPast(x.time));
@@ -116,6 +117,7 @@
            return `<button class="sheet-choice sheet-time-choice ${x.time===S.time?'active':''}" type="button" data-time="${x.time}" ${disabled?'disabled':''} aria-pressed="${x.time===S.time}" aria-label="${name} ${x.time}${disabled?' 지난 시간':''}">${x.time}</button>`;
         }).join('')}</div></div>`;
     }).join('');
+    document.querySelectorAll('#time-groups .sheet-time-scroll').forEach((el,i)=>{el.scrollLeft=keep[i]||0;});
     $('#time-groups').querySelectorAll('button[data-time]:not([disabled])').forEach(b=>b.addEventListener('click',()=>{
       S.time=b.dataset.time; S.selected=null;
       const v=BT.timeCheck(S.time);
