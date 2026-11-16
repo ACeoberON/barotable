@@ -152,10 +152,20 @@ window.BT = (function () {
   }
   /* 손님 좌석도 · 예약 확정 · 점주 배정이 함께 쓰는 판정.
    * 문제가 있으면 { kind, reason }, 앉을 수 있으면 null
-   *   kind: time(지난 시간 · 영업시간 밖 · 브레이크) | rule(좌석 수 · 단체석 · 구역 인원) | reserved(이용 시간 겹침) | full(시간대 한도) */
+   *   kind: time(지난 시간 · 휴무일 · 영업시간 밖 · 브레이크) | rule(좌석 수 · 단체석 · 구역 인원) | reserved(이용 시간 겹침) | full(시간대 한도) */
+  function holiday(date) {
+    const h = sget('baro-holidays', { weekly: [], dates: [] });
+    const d = (h.dates || []).find(x => x.date === date);
+    if (d) return d.reason ? `휴무일이에요 (${d.reason})` : '휴무일이에요';
+    const dow = parseDate(date).getDay();
+    if ((h.weekly || []).includes(dow)) return `매주 ${WEEK[dow]}요일은 쉬는 날이에요`;
+    return null;
+  }
   function checkSeat(t, c, list, fl, except) {
     if (!t) return { kind: 'rule', reason: '테이블을 찾을 수 없어요' };
     if (c.date < TODAY || (c.date === TODAY && toMin(c.time) <= toMin(NOW))) return { kind: 'time', reason: '이미 지난 시간이에요' };
+    const off = holiday(c.date);
+    if (off) return { kind: 'time', reason: off };
     const tc = timeCheck(c.time);
     if (!tc.ok) return { kind: 'time', reason: tc.reason };
     const rule = seatRule(t, c.party, fl);
@@ -278,5 +288,5 @@ window.BT = (function () {
   });
 
   return { YEAR, MONTH, TODAY, NOW, store, saveStore, resetStore, floors, allTables, findTable, zoneOf, url, go, draft, saveDraft,
-    guestNo, newGuestNo, reservations, updateReservation, addReservation, removeReservation, resetReservations, isActive, tokenOf, byToken, tokenExpired, lookupUrl, seatRule, tableClash, slotFull, checkSeat, sget, sset, sremove, pad, toMin, toHHMM, parseDate, iso, fmtDate, octoberDays, slots, timeCheck, esc, toast };
+    guestNo, newGuestNo, reservations, updateReservation, addReservation, removeReservation, resetReservations, isActive, tokenOf, byToken, tokenExpired, lookupUrl, seatRule, tableClash, slotFull, holiday, checkSeat, sget, sset, sremove, pad, toMin, toHHMM, parseDate, iso, fmtDate, octoberDays, slots, timeCheck, esc, toast };
 })();

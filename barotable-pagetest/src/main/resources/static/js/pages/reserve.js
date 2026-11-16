@@ -54,7 +54,7 @@
     if (d) d.textContent = BT.fmtDate(S.date, 'long');
     if (p) p.textContent = `${S.party}명 · ${S.time || '시간 미선택'}`;
     const confirm = $('#sheet-confirm');
-    if (confirm) confirm.disabled = !S.time || isPast(S.time) || !BT.timeCheck(S.time).ok || !BT.slots().some(x => x.time === S.time && !x.break);
+    if (confirm) confirm.disabled = !S.time || !!BT.holiday(S.date) || isPast(S.time) || !BT.timeCheck(S.time).ok || !BT.slots().some(x => x.time === S.time && !x.break);
   }
   function renderDates() {
     const box = $('#date-strip');
@@ -68,11 +68,11 @@
     const currentDays = Array.from({length: count}, (_, i) => {
       const day = i + 1, date = new Date(viewYear, viewMonth - 1, day);
       const iso = `${viewYear}-${BT.pad(viewMonth)}-${BT.pad(day)}`;
-      return {iso, day, dow: date.getDay(), week: ['일','월','화','수','목','금','토'][date.getDay()], past: iso < BT.TODAY, today: iso === BT.TODAY};
+      return {iso, day, dow: date.getDay(), week: ['일','월','화','수','목','금','토'][date.getDay()], past: iso < BT.TODAY, off: !!BT.holiday(iso), today: iso === BT.TODAY};
     });
     box.innerHTML = Array.from({length: offset}, () => '<span class="calendar-empty" aria-hidden="true"></span>').join('') + currentDays.map(x => `
       <button type="button" class="calendar-day ${x.dow === 0 ? 'sun' : ''} ${x.dow === 6 ? 'sat' : ''} ${x.iso === S.date ? 'on' : ''}"
-       data-date="${x.iso}" ${x.past ? 'disabled' : ''} aria-pressed="${x.iso === S.date}" aria-label="${viewMonth}월 ${x.day}일 ${x.week}요일${x.past ? ', 지난 날짜' : ''}">
+       data-date="${x.iso}" ${x.past || x.off ? 'disabled' : ''} aria-pressed="${x.iso === S.date}" aria-label="${viewMonth}월 ${x.day}일 ${x.week}요일${x.past ? ', 지난 날짜' : x.off ? ', 휴무일' : ''}">
        <span>${x.day}</span>${x.today ? '<small>오늘</small>' : ''}</button>`).join('');
     box.querySelectorAll('button:not([disabled])').forEach(b => b.addEventListener('click', () => {
       S.date = b.dataset.date;
