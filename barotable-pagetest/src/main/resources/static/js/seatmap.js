@@ -79,7 +79,6 @@ window.SeatMap = (function () {
       // 고객 예약에 한해서 예약 완료 / 인원 불일치 좌석은 실제 비활성화한다.
       // 점주 화면에서는 기존처럼 예약된 좌석도 조회할 수 있다.
       if (document.body.dataset.screen === 'reserve' && ['reserved', 'small', 'rule'].includes(st.cls)) {
-        el.disabled = true;
         el.setAttribute('aria-disabled', 'true');
       }
       if (st.title) el.title = st.title;

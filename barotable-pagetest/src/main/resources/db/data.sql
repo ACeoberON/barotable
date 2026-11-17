@@ -63,6 +63,14 @@ INSERT IGNORE INTO table_use (use_id, table_id, reservation_id, party, seated_at
 INSERT IGNORE INTO account (account_id, email, password_hash, name, phone, role, status) VALUES
  (5, 'member@example.com', '$2a$10$iL.IwPQW3eEPTzOxkQoXzu7QEd5uYfkV.H0YNw1bpnZ0viVSs5Peq', '김바로', '010-1234-5678', 'CUSTOMER', 'ACTIVE');
 
+-- 2층 나머지 테이블·시설물 (프로토타입 좌석도와 맞춤)
+INSERT IGNORE INTO dining_table (table_id, floor_id, zone_id, table_no, seats, shape, tags, x, y, w, h) VALUES
+ (16, 2, 4, 'T22', 2, 'ROUND', '야외', 190, 84, 90, 90),
+ (17, 2, 5, 'T25', 4, 'SQUARE', '소파', 264, 300, 160, 80),
+ (18, 2, 5, 'T26', 2, 'ROUND', '조용함', 84, 434, 90, 90),
+ (19, 2, 5, 'T27', 2, 'ROUND', '조용함', 230, 434, 90, 90),
+ (20, 2, 6, 'R02', 6, 'ROOM', '프라이빗', 524, 334, 272, 200);
+
 -- 화면 시연용 예약: 서버를 켠 날(오늘)과 5일 뒤. 예약번호에 날짜가 들어가서 날마다 새로 생기고, 같은 날 다시 켜면 건너뛴다
 INSERT IGNORE INTO reservation (reservation_no, store_id, table_id, account_id, guest_name, guest_phone, guest_email,
   visit_date, start_time, end_time, party, channel, status, request)
@@ -78,19 +86,11 @@ INSERT IGNORE INTO reservation (reservation_no, store_id, table_id, account_id, 
  UNION ALL SELECT CONCAT('BT-', DATE_FORMAT(CURDATE(), '%Y%m%d'), '-0027'), 1, 13, NULL, '오수아', '010-1212-3434', 'sua@example.com', CURDATE(), '20:00', ADDTIME('20:00', '01:30:00'), 4, 'CHAT', 'BOOKED', '테라스 담요'
  UNION ALL SELECT CONCAT('BT-', DATE_FORMAT(CURDATE(), '%Y%m%d'), '-0028'), 1, 6, NULL, '서예준', '010-5656-7878', 'yejun@example.com', CURDATE(), '20:00', ADDTIME('20:00', '01:30:00'), 2, 'WEB', 'BOOKED', NULL
  UNION ALL
- SELECT CONCAT('BT-', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '%Y%m%d'), '-0011'), 1, 1, NULL, '조하린', '010-3131-2020', 'harin@example.com', DATE_ADD(CURDATE(), INTERVAL 5 DAY), '12:00', ADDTIME('12:00', '01:30:00'), 2, 'WEB', 'BOOKED', NULL
- UNION ALL SELECT CONCAT('BT-', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '%Y%m%d'), '-0024'), 1, 5, NULL, '배도현', '010-4242-3030', 'dohyun@example.com', DATE_ADD(CURDATE(), INTERVAL 5 DAY), '18:00', ADDTIME('18:00', '01:30:00'), 2, 'WEB', 'BOOKED', NULL
- UNION ALL SELECT CONCAT('BT-', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '%Y%m%d'), '-0029'), 1, 6, NULL, '임서진', '010-6464-5050', 'seojin@example.com', DATE_ADD(CURDATE(), INTERVAL 5 DAY), '19:00', ADDTIME('19:00', '01:30:00'), 2, 'WEB', 'BOOKED', NULL
- UNION ALL SELECT CONCAT('BT-', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '%Y%m%d'), '-0033'), 1, 12, NULL, '권나래', '010-7575-6060', 'narae@example.com', DATE_ADD(CURDATE(), INTERVAL 5 DAY), '19:30', ADDTIME('19:30', '01:30:00'), 2, 'CHAT', 'BOOKED', '야외 자리'
- UNION ALL SELECT CONCAT('BT-', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '%Y%m%d'), '-0035'), 1, 9, NULL, '남궁현', '010-8686-7070', 'hyun@example.com', DATE_ADD(CURDATE(), INTERVAL 5 DAY), '20:00', ADDTIME('20:00', '01:30:00'), 2, 'WEB', 'BOOKED', NULL;
-
--- 2층 나머지 테이블·시설물 (프로토타입 좌석도와 맞춤)
-INSERT IGNORE INTO dining_table (table_id, floor_id, zone_id, table_no, seats, shape, tags, x, y, w, h) VALUES
- (16, 2, 4, 'T22', 2, 'ROUND', '야외', 190, 84, 90, 90),
- (17, 2, 5, 'T25', 4, 'SQUARE', '소파', 264, 300, 160, 80),
- (18, 2, 5, 'T26', 2, 'ROUND', '조용함', 84, 434, 90, 90),
- (19, 2, 5, 'T27', 2, 'ROUND', '조용함', 230, 434, 90, 90),
- (20, 2, 6, 'R02', 6, 'ROOM', '프라이빗', 524, 334, 272, 200);
+ SELECT CONCAT('BT-', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '%Y%m%d'), '-0011'), 1, 14, NULL, '조하린', '010-3131-2020', 'harin@example.com', DATE_ADD(CURDATE(), INTERVAL 5 DAY), '12:00', ADDTIME('12:00', '01:30:00'), 2, 'WEB', 'BOOKED', NULL
+ UNION ALL SELECT CONCAT('BT-', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '%Y%m%d'), '-0024'), 1, 17, NULL, '배도현', '010-4242-3030', 'dohyun@example.com', DATE_ADD(CURDATE(), INTERVAL 5 DAY), '18:00', ADDTIME('18:00', '01:30:00'), 2, 'WEB', 'BOOKED', NULL
+ UNION ALL SELECT CONCAT('BT-', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '%Y%m%d'), '-0029'), 1, 18, NULL, '임서진', '010-6464-5050', 'seojin@example.com', DATE_ADD(CURDATE(), INTERVAL 5 DAY), '19:00', ADDTIME('19:00', '01:30:00'), 2, 'WEB', 'BOOKED', NULL
+ UNION ALL SELECT CONCAT('BT-', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '%Y%m%d'), '-0033'), 1, 16, NULL, '권나래', '010-7575-6060', 'narae@example.com', DATE_ADD(CURDATE(), INTERVAL 5 DAY), '19:30', ADDTIME('19:30', '01:30:00'), 2, 'CHAT', 'BOOKED', '야외 자리'
+ UNION ALL SELECT CONCAT('BT-', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 5 DAY), '%Y%m%d'), '-0035'), 1, 19, NULL, '남궁현', '010-8686-7070', 'hyun@example.com', DATE_ADD(CURDATE(), INTERVAL 5 DAY), '20:00', ADDTIME('20:00', '01:30:00'), 2, 'WEB', 'BOOKED', NULL;
 
 INSERT IGNORE INTO facility (facility_id, floor_id, kind, x, y, w, h) VALUES
  (7, 2, 'WINDOW', 30, 242, 430, 12), (8, 2, 'WALL', 490, 294, 340, 10), (9, 2, 'RESTROOM', 860, 454, 110, 110);

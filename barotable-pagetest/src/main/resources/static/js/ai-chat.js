@@ -172,8 +172,9 @@
     const r = mockExtract(text);
     // 규칙 파서가 읽었지만 값이 잘못된 항목은 LLM에 다시 묻지 않는다
     const gaps = ['date', 'time', 'party'].filter(k => slot[k] == null && r[k] == null && !r.problems.some(p => p.k === k));
-    via = gaps.length ? 'llm' : 'rule';
-    if (gaps.length) Object.assign(r, mockLocalLLM(text, gaps));
+    const filled = gaps.length ? mockLocalLLM(text, gaps) : {};
+    via = Object.keys(filled).length ? 'llm' : 'rule';
+    Object.assign(r, filled);
     if (r.phone) bot('연락처나 이메일은 채팅에 저장하지 않아요. 다음 단계 입력칸에서 따로 받을게요.', 'warn');
     let got = false;
     ['date', 'time', 'party'].forEach(k => { if (r[k] != null) { slot[k] = r[k]; got = true; } });
@@ -209,7 +210,7 @@
     const cell = (label, val) => `<div class="extract-cell ${val == null ? 'missing' : ''}"><span>${label}</span><b>${val == null ? '확인 필요' : BT.esc(val)}</b></div>`;
     el.innerHTML = `
       <div class="row" style="justify-content:space-between"><b style="font-size:13.5px">${done ? '예약 정보를 정리했어요' : '지금까지 정리한 내용'}</b><span class="badge badge-indigo">정해진 항목만 추출</span></div>
-      <div class="row"><span class="badge ${via === 'llm' ? 'badge-amber' : 'badge-teal'}" title="${via === 'llm' ? '규칙으로 읽지 못한 항목을 ' + LLM + '에 맡겼어요' : '규칙 파서만으로 읽었어요'}">${via === 'llm' ? LLM_BY + ' 해석' : '규칙 파서로 해석'}</span></div>
+      <div class="row"><span class="badge ${via === 'llm' ? 'badge-amber' : 'badge-teal'}" title="${via === 'llm' ? '규칙으로 읽지 못한 항목을 고정 응답 표에서 찾았어요' : '규칙 파서만으로 읽었어요'}">${via === 'llm' ? '로컬 LLM(고정 응답)으로 해석' : '규칙 파서로 해석'}</span></div>
       <div class="extract-grid">
         ${cell('날짜', slot.date ? BT.fmtDate(slot.date) : null)}
         ${cell('시간', slot.time)}
