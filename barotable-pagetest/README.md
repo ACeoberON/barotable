@@ -61,8 +61,8 @@ A-01 점주·관리자 로그인 · A-01-1 점주 회원가입·첫 설정 · A-
 ### 실행
 - 테스트: `./gradlew test` (Windows는 `gradlew.bat test`) → MySQL에 연결해 18개 테스트 (DB 9개 + 화면 API 9개)
 - 서버: `./gradlew bootRun` → http://localhost:8080 (bootRun은 개발 모드 `dev` 프로필로 켜집니다)
-- DB 연결 확인 화면: http://localhost:8080/dev/db (테이블 9개 행 수, 매장·좌석도·예약 조회, 예약 저장, 겹침 검사, 동시 예약 잠금 시연). 화면 메뉴에는 넣지 않았으니 주소를 직접 입력합니다. 개발 모드(`dev` 프로필)에서만 열리고, jar로 실행하면 없는 주소(404)입니다.
-- GitHub Pages에서는 서버가 없어서 `templates/dev/db-snapshot.html`(실제 MySQL 실행 기록)을 직접 엽니다.
+- DB 연결 확인 화면: http://localhost:8080/dev/db (테이블 9개 행 수, 매장·좌석도·예약 조회, 예약 저장, 겹침 검사, 동시 예약 잠금 시연). 서비스 관리자 화면 왼쪽 "바로가기"에도 링크가 있습니다. 개발 모드(`dev` 프로필)에서만 열리고, jar로 실행하면 없는 주소(404)입니다.
+- GitHub Pages에서는 서버가 없어서 같은 링크가 `templates/dev/db-snapshot.html`(실제 MySQL 실행 기록)로 열립니다.
 
 ### 패키지
 | 패키지 | 테이블 |
