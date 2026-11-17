@@ -45,11 +45,11 @@ public class WebReservationService {
     /** 손님 예약 저장. accountId 가 있으면 회원 예약, 없으면 비회원(조회 토큰 발급) */
     @Transactional
     public Reservation create(Booking b, Long accountId) {
+        StoreRule rule = ruleRepository.findByIdForUpdate(STORE_ID).orElseThrow();
         DiningTable found = tableRepository.findByStoreAndNo(STORE_ID, b.tableNo())
                 .orElseThrow(() -> new IllegalArgumentException("없는 테이블입니다: " + b.tableNo()));
         // ① 테이블 행 잠금 (같은 테이블 예약끼리 순서대로 처리)
         DiningTable table = tableRepository.findByIdForUpdate(found.getId()).orElseThrow();
-        StoreRule rule = ruleRepository.findById(STORE_ID).orElseThrow();
 
         // ② 규칙 확인
         if (!table.isActive()) throw new IllegalStateException("사용하지 않는 테이블입니다");
@@ -102,6 +102,7 @@ public class WebReservationService {
     /** 점주 화면: 상태 변경 */
     @Transactional
     public Reservation changeStatus(String no, ReservationStatus status) {
+        ruleRepository.findByIdForUpdate(STORE_ID);
         Reservation r = reservationRepository.findByReservationNo(no)
                 .orElseThrow(() -> new IllegalArgumentException("없는 예약입니다: " + no));
         boolean wasActive = r.getStatus() == ReservationStatus.BOOKED || r.getStatus() == ReservationStatus.VISITED;
@@ -123,6 +124,7 @@ public class WebReservationService {
     /** 점주 화면: 테이블 이동. 옮길 테이블을 잠그고 겹침을 다시 확인한다 */
     @Transactional
     public Reservation move(String no, String tableNo) {
+        ruleRepository.findByIdForUpdate(STORE_ID);
         Reservation r = reservationRepository.findByReservationNo(no)
                 .orElseThrow(() -> new IllegalArgumentException("없는 예약입니다: " + no));
         DiningTable found = tableRepository.findByStoreAndNo(STORE_ID, tableNo)
@@ -140,6 +142,7 @@ public class WebReservationService {
     @Transactional
     public Reservation cancelByGuest(Reservation r) {
         if (r.getStatus() == ReservationStatus.CANCELED) return r;
+        if (r.getStatus() == ReservationStatus.NO_SHOW) throw new IllegalStateException("노쇼 처리된 예약이라 취소할 수 없어요");
         if (r.getStatus() != ReservationStatus.BOOKED) throw new IllegalStateException("이미 방문 처리된 예약이라 취소할 수 없어요");
         if (!LocalDateTime.of(r.getVisitDate(), r.getStartTime()).isAfter(LocalDateTime.now()))
             throw new IllegalStateException("예약 시간이 지나 온라인으로 취소할 수 없어요. 매장으로 연락해 주세요");
@@ -155,7 +158,7 @@ public class WebReservationService {
         return prefix + String.format("%04d", n);
     }
 
-    /** 조회 링크용 22자 무작위 값 (약 129비트) */
+    /** 조회 링크용 22자 무작위 값 (약 128비트) */
     static String newToken() {
         StringBuilder sb = new StringBuilder(22);
         for (int i = 0; i < 22; i++) sb.append(TOKEN_CHARS.charAt(RANDOM.nextInt(TOKEN_CHARS.length())));

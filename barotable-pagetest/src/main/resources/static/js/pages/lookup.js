@@ -66,6 +66,7 @@
   /* 취소할 수 없으면 이유, 할 수 있으면 null */
   function cancelBlock(r) {
     if (r.status === 'cancelled') return null;
+    if (r.status === 'noshow') return '노쇼 처리된 예약이라 취소할 수 없어요.';
     if (r.status !== 'booked') return '이미 방문 처리된 예약이라 취소할 수 없어요.';
     if (r.date < BT.TODAY || (r.date === BT.TODAY && BT.toMin(r.time) <= BT.toMin(BT.NOW))) return '예약 시간이 지나 온라인으로 취소할 수 없어요. 매장으로 연락해 주세요.';
     return null;
@@ -137,7 +138,7 @@
     // 실제 구현: 서버가 이 이메일의 유효한 예약마다 링크를 메일로 보낸다. 화면에는 예약 유무를 알리지 않는다.
     const msg = $('#rs-msg');
     msg.hidden = false;
-    msg.textContent = `${email}(으)로 예약이 있다면 조회 링크를 보냈어요. 몇 분 안에 메일이 오지 않으면 주소를 다시 확인해 주세요.`;
+    msg.textContent = '메일 발송은 아직 구현되지 않았어요. 예약번호와 연락처로 조회해 주세요.';
   });
 
   /* 3) 예약번호 + 연락처 */

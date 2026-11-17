@@ -59,7 +59,7 @@
   function preview() {
     const v = read(), h = v.hours, m = BT.toMin;
     const ok = h.open && h.close && m(h.open) < m(h.close);
-    const last = ok ? BT.toHHMM(m(h.close) - 30) : '-';
+    const last = ok ? BT.toHHMM(m(h.close) - v.dineMinutes) : '-';
     const brk = h.breakStart && h.breakEnd && h.breakStart !== h.breakEnd ? ` · 브레이크 ${h.breakStart}–${h.breakEnd} 제외` : ' · 브레이크 없음';
     $('#s-preview').textContent = `손님 화면 예약 시간: ${h.open || '-'} ~ ${last}${brk}`;
     $('#save-state').textContent = dirty ? '저장하지 않은 변경이 있어요' : '저장된 설정';
