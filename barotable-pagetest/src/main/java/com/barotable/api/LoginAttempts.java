@@ -1,5 +1,6 @@
 package com.barotable.api;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -14,6 +15,10 @@ class LoginAttempts {
     private final ConcurrentHashMap<String, Attempt> attempts = new ConcurrentHashMap<>();
 
     private record Attempt(int failures, Instant blockedUntil) {}
+
+    static String key(String email, HttpServletRequest req) {
+        return email + "|" + req.getRemoteAddr();
+    }
 
     synchronized boolean isBlocked(String email) {
         Attempt attempt = attempts.get(email);

@@ -200,6 +200,33 @@ class WebApiTest {
     }
 
     @Test
+    void 같은_이메일이어도_다른_IP에서는_로그인할_수_있다() throws Exception {
+        String email = "login-ip-" + UUID.randomUUID() + "@example.com";
+        String password = UUID.randomUUID().toString();
+        String correct = "{\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, password);
+        String wrong = "{\"email\":\"%s\",\"password\":\"wrong\"}".formatted(email);
+
+        try {
+            mvc.perform(post("/api/member/signup").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"%s\",\"password\":\"%s\",\"name\":\"시험회원\",\"phone\":\"010-5555-0000\"}".formatted(email, password)))
+                    .andExpect(status().isOk());
+            for (int i = 0; i < 5; i++) {
+                mvc.perform(post("/api/member/login").with(r -> { r.setRemoteAddr("10.0.0.1"); return r; })
+                                .contentType(MediaType.APPLICATION_JSON).content(wrong))
+                        .andExpect(status().isUnauthorized());
+            }
+            mvc.perform(post("/api/member/login").with(r -> { r.setRemoteAddr("10.0.0.1"); return r; })
+                            .contentType(MediaType.APPLICATION_JSON).content(correct))
+                    .andExpect(status().isTooManyRequests());
+            mvc.perform(post("/api/member/login").with(r -> { r.setRemoteAddr("10.0.0.2"); return r; })
+                            .contentType(MediaType.APPLICATION_JSON).content(correct))
+                    .andExpect(status().isOk());
+        } finally {
+            jdbc.update("delete from account where email = ?", email);
+        }
+    }
+
+    @Test
     void 점주_상태변경과_테이블이동() throws Exception {
         MockHttpSession owner = staff("owner@example.com");
         String a = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:00", 4)))
