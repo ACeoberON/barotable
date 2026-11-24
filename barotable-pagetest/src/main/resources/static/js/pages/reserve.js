@@ -43,7 +43,10 @@
     return t && { t, matched: best > 0 };
   }
 
-  const initialDate = /^\d{4}-\d{2}-\d{2}$/.test(d0.date || '') && d0.date >= BT.TODAY ? d0.date : (days.find(x => !x.past) || days[0]).iso;
+  const lastBookingDay = BT.parseDate(BT.TODAY);
+  lastBookingDay.setDate(lastBookingDay.getDate() + 60);
+  const lastBookingDate = BT.iso(lastBookingDay), lastBookingMonth = lastBookingDate.slice(0, 7);
+  const initialDate = /^\d{4}-\d{2}-\d{2}$/.test(d0.date || '') && d0.date >= BT.TODAY && d0.date <= lastBookingDate ? d0.date : (days.find(x => !x.past) || days[0]).iso;
   const S = { date: initialDate, time: d0.time, party: Math.min(st.maxParty, Math.max(st.minParty, d0.party)), floor: fl[0].id, zone: 'all', selected: null, request: '', prefs: [] };
   const todayYear = Number(BT.TODAY.slice(0, 4)), todayMonth = Number(BT.TODAY.slice(5, 7));
   let viewYear = Number(S.date.slice(0, 4)), viewMonth = Number(S.date.slice(5, 7));
@@ -65,14 +68,16 @@
     if (label) label.textContent = `${viewYear}년 ${viewMonth}월`;
     const prev = $('#calendar-prev');
     if (prev) prev.disabled = viewYear < todayYear || (viewYear === todayYear && viewMonth <= todayMonth);
+    const next = $('#calendar-next');
+    if (next) next.disabled = BT.iso(first).slice(0, 7) >= lastBookingMonth;
     const currentDays = Array.from({length: count}, (_, i) => {
       const day = i + 1, date = new Date(viewYear, viewMonth - 1, day);
       const iso = `${viewYear}-${BT.pad(viewMonth)}-${BT.pad(day)}`;
-      return {iso, day, dow: date.getDay(), week: ['일','월','화','수','목','금','토'][date.getDay()], past: iso < BT.TODAY, off: !!BT.holiday(iso), today: iso === BT.TODAY};
+      return {iso, day, dow: date.getDay(), week: ['일','월','화','수','목','금','토'][date.getDay()], past: iso < BT.TODAY, tooLate: iso > lastBookingDate, off: !!BT.holiday(iso), today: iso === BT.TODAY};
     });
     box.innerHTML = Array.from({length: offset}, () => '<span class="calendar-empty" aria-hidden="true"></span>').join('') + currentDays.map(x => `
       <button type="button" class="calendar-day ${x.dow === 0 ? 'sun' : ''} ${x.dow === 6 ? 'sat' : ''} ${x.iso === S.date ? 'on' : ''}"
-       data-date="${x.iso}" ${x.past || x.off ? 'disabled' : ''} aria-pressed="${x.iso === S.date}" aria-label="${viewMonth}월 ${x.day}일 ${x.week}요일${x.past ? ', 지난 날짜' : x.off ? ', 휴무일' : ''}">
+       data-date="${x.iso}" ${x.past || x.tooLate || x.off ? 'disabled' : ''} aria-pressed="${x.iso === S.date}" aria-label="${viewMonth}월 ${x.day}일 ${x.week}요일${x.past ? ', 지난 날짜' : x.tooLate ? ', 예약 가능 기간 이후' : x.off ? ', 휴무일' : ''}">
        <span>${x.day}</span>${x.today ? '<small>오늘</small>' : ''}</button>`).join('');
     box.querySelectorAll('button:not([disabled])').forEach(b => b.addEventListener('click', () => {
       S.date = b.dataset.date;
@@ -85,6 +90,7 @@
     const next = new Date(viewYear, viewMonth - 1 + delta, 1);
     const targetYear = next.getFullYear(), targetMonth = next.getMonth() + 1;
     if (delta < 0 && (targetYear < todayYear || (targetYear === todayYear && targetMonth < todayMonth))) return;
+    if (BT.iso(next).slice(0, 7) > lastBookingMonth) return;
     viewYear = targetYear; viewMonth = targetMonth; renderDates();
   }
   $('#calendar-prev').addEventListener('click', () => shiftCalendarMonth(-1));
