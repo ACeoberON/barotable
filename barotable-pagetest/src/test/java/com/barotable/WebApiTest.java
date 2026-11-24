@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -166,6 +167,39 @@ class WebApiTest {
     }
 
     @Test
+    void 두_로그인의_실패_횟수를_합쳐_다섯_번이면_정확한_비밀번호도_거절한다() throws Exception {
+        String email = "login-limit-" + UUID.randomUUID() + "@example.com";
+        String password = UUID.randomUUID().toString();
+        String correct = "{\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, password);
+        String wrong = "{\"email\":\"%s\",\"password\":\"wrong\"}".formatted(email);
+
+        try {
+            mvc.perform(post("/api/member/signup").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"%s\",\"password\":\"%s\",\"name\":\"시험회원\",\"phone\":\"010-5555-0000\"}".formatted(email, password)))
+                    .andExpect(status().isOk());
+            for (int i = 0; i < 4; i++) {
+                mvc.perform(post("/api/member/login").contentType(MediaType.APPLICATION_JSON).content(wrong))
+                        .andExpect(status().isUnauthorized());
+            }
+            mvc.perform(post("/api/member/login").contentType(MediaType.APPLICATION_JSON).content(correct))
+                    .andExpect(status().isOk());
+
+            for (int i = 0; i < 5; i++) {
+                String path = i < 2 ? "/api/staff/login" : "/api/member/login";
+                mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(wrong))
+                        .andExpect(status().isUnauthorized());
+            }
+            mvc.perform(post("/api/member/login").contentType(MediaType.APPLICATION_JSON).content(correct))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.message").value("로그인 시도가 너무 많아요. 5분 뒤에 다시 시도해 주세요"));
+            mvc.perform(post("/api/staff/login").contentType(MediaType.APPLICATION_JSON).content(correct))
+                    .andExpect(status().isTooManyRequests());
+        } finally {
+            jdbc.update("delete from account where email = ?", email);
+        }
+    }
+
+    @Test
     void 점주_상태변경과_테이블이동() throws Exception {
         MockHttpSession owner = staff("owner@example.com");
         String a = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:00", 4)))
@@ -309,5 +343,30 @@ class WebApiTest {
                 .andExpect(status().isOk());
         mvc.perform(patch("/api/owner/reservations/" + no).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"table\":\"T08\"}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("이동할 수 없는 예약이에요"));
+    }
+
+    @Test
+    void 점주_PATCH는_같은_호스트에서_보낸_요청만_허용한다() throws Exception {
+        MockHttpSession owner = staff("owner@example.com");
+        String no = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:00", 4)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("no").asText();
+        String path = "/api/owner/reservations/" + no;
+        String host = "barotable.example:8080";
+        String visit = "{\"status\":\"visited\"}";
+
+        mvc.perform(patch(path).session(owner).header("Host", host).header("Origin", "http://evil.example")
+                        .header("Referer", "http://" + host + "/owner/dashboard").contentType(MediaType.APPLICATION_JSON).content(visit))
+                .andExpect(status().isForbidden());
+        mvc.perform(patch(path).session(owner).header("Host", host).header("Referer", "http://evil.example/form")
+                        .contentType(MediaType.APPLICATION_JSON).content(visit))
+                .andExpect(status().isForbidden());
+        assertThat(jdbc.queryForObject("select status from reservation where reservation_no = ?", String.class, no)).isEqualTo("BOOKED");
+
+        mvc.perform(patch(path).session(owner).header("Host", host).header("Origin", "http://" + host)
+                        .contentType(MediaType.APPLICATION_JSON).content(visit))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("visited"));
+        mvc.perform(patch(path).session(owner).header("Host", host).header("Referer", "http://" + host + "/owner/dashboard")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"booked\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("booked"));
     }
 }
