@@ -39,13 +39,13 @@ public class StaffApiController {
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
         String email = req.email().trim().toLowerCase(Locale.ROOT);
         Account a = accountRepository.findByEmail(email).orElse(null);
-        String loginEmail = a == null ? email : a.getEmail();
+        String loginKey = LoginAttempts.key(a == null ? email : a.getEmail(), http);
         synchronized (loginAttempts) {
-            if (loginAttempts.isBlocked(loginEmail))
+            if (loginAttempts.isBlocked(loginKey))
                 return ResponseEntity.status(429).body(Map.of("message", LoginAttempts.BLOCKED_MESSAGE));
             ResponseEntity<?> result = authenticate(a, req.password(), http);
-            if (result.getStatusCode().is2xxSuccessful()) loginAttempts.reset(loginEmail);
-            else loginAttempts.recordFailure(loginEmail);
+            if (result.getStatusCode().is2xxSuccessful()) loginAttempts.reset(loginKey);
+            else loginAttempts.recordFailure(loginKey);
             return result;
         }
     }
