@@ -1219,6 +1219,7 @@ body[data-screen="index"] .proto-bar,body[data-screen="reserve"] .proto-bar{disp
   .side-identity .brand { font-size:17px; }
   .side-role { font-size:7px; letter-spacing:1px; }
   .side-store,.side-section-title,.side-shortcut,.side-bottom,.side-who,.side .grow { display:none!important; }
+  #owner-side > .side-bottom { display:flex!important; }
   .side-nav { flex-direction:row; flex-wrap:nowrap; gap:3px; }
   .owner-shell > .side .side-nav a { white-space:nowrap;min-height:34px;padding:7px 10px;font-size:12px; }
   .owner-shell > .side .side-nav .side-icon { width:15px;height:15px;flex-basis:15px; }
@@ -1413,6 +1414,9 @@ body[data-screen="admin"] .side a.on { background:#ebeef1;color:#26374A;font-wei
   body[data-screen^="owner-"] .owner-shell > .side .side-bottom,
   body[data-screen^="owner-"] .owner-shell > .side .side-who,
   body[data-screen^="owner-"] .owner-shell > .side .grow { display:none !important; }
+  #owner-side > .side-bottom { display:contents!important; }
+  #owner-side .side-bottom a[data-go="index"] { display:none; }
+  #owner-side .side-bottom a[data-go="owner-login"] { order:-1; flex:0 0 auto; }
   body[data-screen^="owner-"] .owner-shell > .side .side-nav { display:flex;flex-direction:row;gap:5px;min-width:max-content; }
   body[data-screen^="owner-"] .owner-shell > .side .side-nav a { width:auto;flex:0 0 auto;padding:8px 10px;min-height:36px;font-size:12px; }
   body[data-screen^="owner-"] .owner-shell > .side .side-nav .side-icon { width:14px;height:14px;flex-basis:14px; }
