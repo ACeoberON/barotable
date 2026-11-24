@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Locale;
 import java.util.Map;
 
 @RestController
@@ -29,15 +30,29 @@ public class StaffApiController {
     private static final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
 
     private final AccountRepository accountRepository;
+    private final LoginAttempts loginAttempts;
 
     public record LoginRequest(@NotBlank String email, @NotBlank String password) {}
 
     @PostMapping("/login")
     @Transactional(readOnly = true)
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
-        Account a = accountRepository.findByEmail(req.email().trim().toLowerCase()).orElse(null);
+        String email = req.email().trim().toLowerCase(Locale.ROOT);
+        Account a = accountRepository.findByEmail(email).orElse(null);
+        String loginEmail = a == null ? email : a.getEmail();
+        synchronized (loginAttempts) {
+            if (loginAttempts.isBlocked(loginEmail))
+                return ResponseEntity.status(429).body(Map.of("message", LoginAttempts.BLOCKED_MESSAGE));
+            ResponseEntity<?> result = authenticate(a, req.password(), http);
+            if (result.getStatusCode().is2xxSuccessful()) loginAttempts.reset(loginEmail);
+            else loginAttempts.recordFailure(loginEmail);
+            return result;
+        }
+    }
+
+    private ResponseEntity<?> authenticate(Account a, String password, HttpServletRequest http) {
         boolean staff = a != null && (a.getRole() == Role.OWNER || a.getRole() == Role.ADMIN);
-        if (!staff || !a.getPasswordHash().startsWith("$2") || !ENCODER.matches(req.password(), a.getPasswordHash()))
+        if (!staff || !a.getPasswordHash().startsWith("$2") || !ENCODER.matches(password, a.getPasswordHash()))
             return ResponseEntity.status(401).body(Map.of("message", "이메일 또는 비밀번호가 맞지 않아요."));
         if (a.getStatus() != AccountStatus.ACTIVE)
             return ResponseEntity.status(403).body(Map.of("message", "아직 승인되지 않은 계정이에요. 서비스 관리자 승인 후 로그인할 수 있어요."));

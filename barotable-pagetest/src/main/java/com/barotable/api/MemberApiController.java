@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -36,6 +37,7 @@ public class MemberApiController {
 
     private final AccountRepository accountRepository;
     private final ReservationRepository reservationRepository;
+    private final LoginAttempts loginAttempts;
 
     public record SignupRequest(
             @NotBlank @Email @Size(max = 100) String email,
@@ -59,10 +61,23 @@ public class MemberApiController {
     @PostMapping("/login")
     @Transactional(readOnly = true)
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
-        Account a = accountRepository.findByEmail(req.email().trim().toLowerCase()).orElse(null);
+        String email = req.email().trim().toLowerCase(Locale.ROOT);
+        Account a = accountRepository.findByEmail(email).orElse(null);
+        String loginEmail = a == null ? email : a.getEmail();
+        synchronized (loginAttempts) {
+            if (loginAttempts.isBlocked(loginEmail))
+                return ResponseEntity.status(429).body(Map.of("message", LoginAttempts.BLOCKED_MESSAGE));
+            ResponseEntity<?> result = authenticate(a, req.password(), http);
+            if (result.getStatusCode().is2xxSuccessful()) loginAttempts.reset(loginEmail);
+            else loginAttempts.recordFailure(loginEmail);
+            return result;
+        }
+    }
+
+    private ResponseEntity<?> authenticate(Account a, String password, HttpServletRequest http) {
         // 없는 계정·틀린 비밀번호·손님이 아닌 계정은 같은 문구로 (어느 쪽인지 알려 주지 않는다)
         if (a == null || a.getRole() != Role.CUSTOMER || a.getStatus() != AccountStatus.ACTIVE
-                || !a.getPasswordHash().startsWith("$2") || !ENCODER.matches(req.password(), a.getPasswordHash()))
+                || !a.getPasswordHash().startsWith("$2") || !ENCODER.matches(password, a.getPasswordHash()))
             return ResponseEntity.status(401).body(Map.of("message", "이메일 또는 비밀번호가 맞지 않아요."));
         startSession(http, a);
         return ResponseEntity.ok(me(a));
