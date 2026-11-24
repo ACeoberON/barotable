@@ -2,6 +2,7 @@ package com.barotable;
 
 import com.barotable.reservation.ReservationRepository;
 import com.barotable.reservation.ReservationService;
+import com.barotable.reservation.WebReservationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -22,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReservationConcurrencyTest {
 
     @Autowired ReservationService reservationService;
+    @Autowired WebReservationService webReservationService;
     @Autowired ReservationRepository reservationRepository;
     @Autowired JdbcTemplate jdbc;
 
@@ -59,5 +62,36 @@ class ReservationConcurrencyTest {
         assertThat(ok.get()).isEqualTo(1);
         assertThat(rejected.get()).isEqualTo(1);
         assertThat(reservationRepository.countOverlaps(3L, DATE, LocalTime.of(19, 0), LocalTime.of(20, 30))).isEqualTo(1);
+    }
+
+    @Test
+    void webCreateOnlyOneWins() throws Exception {
+        LocalDate date = LocalDate.now().plusDays(31);
+        String guestName = "TEST-" + UUID.randomUUID();
+        WebReservationService.Booking booking = new WebReservationService.Booking(
+                "T03", date, LocalTime.of(19, 0), 4, guestName, "010-0000-0000", null, null);
+        CyclicBarrier start = new CyclicBarrier(2);
+        Callable<Boolean> book = () -> {
+            start.await(10, TimeUnit.SECONDS);
+            try {
+                webReservationService.create(booking, null);
+                return true;
+            } catch (IllegalStateException e) {
+                assertThat(e).hasMessage("이미 예약된 시간입니다. 다른 시간이나 테이블을 골라 주세요");
+                return false;
+            }
+        };
+
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<Boolean> first = pool.submit(book);
+            Future<Boolean> second = pool.submit(book);
+            assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(true, false);
+            assertThat(jdbc.queryForObject("select count(*) from reservation where guest_name = ?", Integer.class, guestName))
+                    .isEqualTo(1);
+        } finally {
+            jdbc.update("delete from table_use where reservation_id in (select reservation_id from reservation where guest_name = ?)", guestName);
+            jdbc.update("delete from reservation where guest_name = ?", guestName);
+        }
     }
 }

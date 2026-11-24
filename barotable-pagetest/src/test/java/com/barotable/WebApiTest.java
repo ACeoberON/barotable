@@ -13,6 +13,8 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -32,12 +34,22 @@ class WebApiTest {
 
     static final LocalDate DAY = LocalDate.now().plusDays(30);
     static final String SIGNUP_EMAIL = "apitest@example.com";
+    private final List<String> pastReservationNos = new ArrayList<>();
 
     @AfterEach
     void cleanUp() {
         jdbc.update("delete from table_use where reservation_id in (select reservation_id from reservation where visit_date = ?)", DAY);
         jdbc.update("delete from reservation where visit_date = ?", DAY);
         jdbc.update("delete from account where email = ?", SIGNUP_EMAIL);
+        for (String no : pastReservationNos) {
+            jdbc.update("delete from table_use where reservation_id in (select reservation_id from reservation where reservation_no = ?)", no);
+            jdbc.update("delete from reservation where reservation_no = ?", no);
+        }
+    }
+
+    private void moveBookingDateToYesterday(String no) {
+        pastReservationNos.add(no);
+        jdbc.update("update reservation set visit_date = ? where reservation_no = ?", LocalDate.now().minusDays(1), no);
     }
 
     private MockHttpSession staff(String email) throws Exception {
@@ -166,9 +178,32 @@ class WebApiTest {
                 .andExpect(status().isConflict());
         mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"table\":\"T08\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.table").value("T08"));
+        moveBookingDateToYesterday(a);
         mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"noshow\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("noshow"));
         assertThat(jdbc.queryForObject("select status from reservation where reservation_no = ?", String.class, a)).isEqualTo("NO_SHOW");
+    }
+
+    @Test
+    void 취소된_예약은_방문_처리할_수_없다() throws Exception {
+        MockHttpSession owner = staff("owner@example.com");
+        String no = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:00", 4)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("no").asText();
+        mvc.perform(patch("/api/owner/reservations/" + no).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"cancelled\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("cancelled"));
+        mvc.perform(patch("/api/owner/reservations/" + no).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"visited\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("이 상태에서는 바꿀 수 없어요"));
+        assertThat(jdbc.queryForObject("select status from reservation where reservation_no = ?", String.class, no)).isEqualTo("CANCELED");
+    }
+
+    @Test
+    void 미래_예약은_노쇼_처리할_수_없다() throws Exception {
+        MockHttpSession owner = staff("owner@example.com");
+        String no = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:00", 4)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("no").asText();
+        mvc.perform(patch("/api/owner/reservations/" + no).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"noshow\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("예약 시간 전에는 노쇼 처리할 수 없어요"));
+        assertThat(jdbc.queryForObject("select status from reservation where reservation_no = ?", String.class, no)).isEqualTo("BOOKED");
     }
 
     @Test
@@ -213,6 +248,7 @@ class WebApiTest {
         MockHttpSession owner = staff("owner@example.com");
         String a = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:00", 4)))
                 .andReturn().getResponse().getContentAsString()).get("no").asText();
+        moveBookingDateToYesterday(a);
         mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"noshow\"}"))
                 .andExpect(status().isOk());
         mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"booked\"}"))
@@ -220,8 +256,9 @@ class WebApiTest {
         mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"noshow\"}"))
                 .andExpect(status().isOk());
 
-        mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:30", 4)))
-                .andExpect(status().isOk());
+        String b = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:30", 4)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("no").asText();
+        moveBookingDateToYesterday(b);
         mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"booked\"}"))
                 .andExpect(status().isConflict());
         assertThat(jdbc.queryForObject("select status from reservation where reservation_no = ?", String.class, a)).isEqualTo("NO_SHOW");
@@ -235,13 +272,42 @@ class WebApiTest {
         String countSql = "select count(*) from table_use u join reservation r on r.reservation_id = u.reservation_id where r.reservation_no = ?";
 
         mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"visited\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("visited"));
         mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"visited\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("이 상태에서는 바꿀 수 없어요"));
         assertThat(jdbc.queryForObject(countSql, Integer.class, a)).isEqualTo(1);
 
         mvc.perform(patch("/api/owner/reservations/" + a).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"booked\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("booked"));
         assertThat(jdbc.queryForObject(countSql, Integer.class, a)).isEqualTo(0);
+    }
+
+    @Test
+    void 방문한_예약을_이동하면_착석_기록의_테이블도_바뀐다() throws Exception {
+        MockHttpSession owner = staff("owner@example.com");
+        String no = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T05", "19:00", 2)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("no").asText();
+        String tableSql = "select t.table_no from table_use u join reservation r on r.reservation_id = u.reservation_id "
+                + "join dining_table t on t.table_id = u.table_id where r.reservation_no = ?";
+        mvc.perform(patch("/api/owner/reservations/" + no).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"visited\"}"))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(tableSql, String.class, no)).isEqualTo("T05");
+
+        mvc.perform(patch("/api/owner/reservations/" + no).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"table\":\"T08\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("단체석은 3명 이상부터 이용할 수 있어요"));
+        mvc.perform(patch("/api/owner/reservations/" + no).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"table\":\"T04\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.table").value("T04"));
+        assertThat(jdbc.queryForObject(tableSql, String.class, no)).isEqualTo("T04");
+    }
+
+    @Test
+    void 취소된_예약은_이동할_수_없다() throws Exception {
+        MockHttpSession owner = staff("owner@example.com");
+        String no = om.readTree(mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(booking("T04", "18:00", 4)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("no").asText();
+        mvc.perform(patch("/api/owner/reservations/" + no).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"cancelled\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(patch("/api/owner/reservations/" + no).session(owner).contentType(MediaType.APPLICATION_JSON).content("{\"table\":\"T08\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("이동할 수 없는 예약이에요"));
     }
 }

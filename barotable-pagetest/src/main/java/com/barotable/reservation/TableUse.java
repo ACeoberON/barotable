@@ -53,4 +53,8 @@ public class TableUse {
         u.seatedAt = seatedAt;
         return u;
     }
+
+    public void moveTo(DiningTable table) {
+        this.table = table;
+    }
 }
