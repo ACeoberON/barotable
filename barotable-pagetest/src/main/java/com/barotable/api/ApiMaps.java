@@ -27,7 +27,7 @@ final class ApiMaps {
     /** full=true 면 예약자 정보까지, false 면 빈자리 계산용 값만 */
     static Map<String, Object> reservation(Reservation r, boolean full) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("no", r.getReservationNo());
+        m.put("no", full ? r.getReservationNo() : "");
         m.put("date", r.getVisitDate().toString());
         m.put("time", String.format("%02d:%02d", r.getStartTime().getHour(), r.getStartTime().getMinute()));
         m.put("party", r.getParty());
