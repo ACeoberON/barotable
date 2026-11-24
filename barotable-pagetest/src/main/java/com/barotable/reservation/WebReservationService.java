@@ -55,17 +55,7 @@ public class WebReservationService {
         if (!table.isActive()) throw new IllegalStateException("사용하지 않는 테이블입니다");
         if (b.party() < rule.getMinParty() || b.party() > rule.getMaxParty())
             throw new IllegalStateException("예약 가능 인원은 " + rule.getMinParty() + "~" + rule.getMaxParty() + "명입니다");
-        if (b.party() > table.getSeats())
-            throw new IllegalStateException(table.getSeats() + "인 테이블이라 " + b.party() + "명은 앉을 수 없어요");
-        // 2명 이하는 6인 이상·단체·룸 테이블 불가 (큰 자리는 단체 손님용, 화면 BT.seatRule 과 같은 규칙)
-        boolean bigSeat = table.getSeats() >= 6 || table.getShape() == com.barotable.layout.TableShape.ROOM
-                || (table.getTags() != null && java.util.Arrays.asList(table.getTags().split(",")).contains("단체"));
-        if (b.party() <= 2 && bigSeat) throw new IllegalStateException("단체석은 3명 이상부터 이용할 수 있어요");
-        Zone z = table.getZone();
-        if (z != null && z.getMinParty() != null && b.party() < z.getMinParty())
-            throw new IllegalStateException(z.getName() + "은 " + z.getMinParty() + "명 이상만 받아요");
-        if (z != null && z.getMaxParty() != null && b.party() > z.getMaxParty())
-            throw new IllegalStateException(z.getName() + "은 " + z.getMaxParty() + "명까지만 받아요");
+        checkSeatRule(table, b.party());
         LocalTime t = b.time();
         if (t.isBefore(rule.getOpenTime()) || !t.isBefore(rule.getCloseTime()))
             throw new IllegalStateException("영업시간(" + rule.getOpenTime() + "–" + rule.getCloseTime() + ") 밖이에요");
@@ -105,6 +95,14 @@ public class WebReservationService {
         ruleRepository.findByIdForUpdate(STORE_ID);
         Reservation r = reservationRepository.findByReservationNo(no)
                 .orElseThrow(() -> new IllegalArgumentException("없는 예약입니다: " + no));
+        boolean allowed = switch (r.getStatus()) {
+            case BOOKED -> status == ReservationStatus.VISITED || status == ReservationStatus.NO_SHOW || status == ReservationStatus.CANCELED;
+            case VISITED, NO_SHOW -> status == ReservationStatus.BOOKED;
+            case CANCELED -> false;
+        };
+        if (!allowed) throw new IllegalStateException("이 상태에서는 바꿀 수 없어요");
+        if (status == ReservationStatus.NO_SHOW && LocalDateTime.now().isBefore(LocalDateTime.of(r.getVisitDate(), r.getStartTime())))
+            throw new IllegalStateException("예약 시간 전에는 노쇼 처리할 수 없어요");
         boolean wasActive = r.getStatus() == ReservationStatus.BOOKED || r.getStatus() == ReservationStatus.VISITED;
         boolean willBeActive = status == ReservationStatus.BOOKED || status == ReservationStatus.VISITED;
         if (!wasActive && willBeActive) {
@@ -127,15 +125,31 @@ public class WebReservationService {
         ruleRepository.findByIdForUpdate(STORE_ID);
         Reservation r = reservationRepository.findByReservationNo(no)
                 .orElseThrow(() -> new IllegalArgumentException("없는 예약입니다: " + no));
+        if (r.getStatus() != ReservationStatus.BOOKED && r.getStatus() != ReservationStatus.VISITED)
+            throw new IllegalStateException("이동할 수 없는 예약이에요");
         DiningTable found = tableRepository.findByStoreAndNo(STORE_ID, tableNo)
                 .orElseThrow(() -> new IllegalArgumentException("없는 테이블입니다: " + tableNo));
         DiningTable table = tableRepository.findByIdForUpdate(found.getId()).orElseThrow();
-        if (r.getParty() > table.getSeats())
-            throw new IllegalStateException(table.getSeats() + "인 테이블이라 " + r.getParty() + "명은 앉을 수 없어요");
+        checkSeatRule(table, r.getParty());
         if (reservationRepository.countOverlapsExcept(table.getId(), r.getVisitDate(), r.getStartTime(), r.getEndTime(), r.getId()) > 0)
             throw new IllegalStateException("그 테이블은 이 시간에 다른 예약이 있어요");
         r.moveTo(table);
+        tableUseRepository.findByReservationId(r.getId()).ifPresent(use -> use.moveTo(table));
         return r;
+    }
+
+    private void checkSeatRule(DiningTable table, int party) {
+        if (party > table.getSeats())
+            throw new IllegalStateException(table.getSeats() + "인 테이블이라 " + party + "명은 앉을 수 없어요");
+        // 2명 이하는 6인 이상·단체·룸 테이블 불가 (큰 자리는 단체 손님용, 화면 BT.seatRule 과 같은 규칙)
+        boolean bigSeat = table.getSeats() >= 6 || table.getShape() == com.barotable.layout.TableShape.ROOM
+                || (table.getTags() != null && java.util.Arrays.asList(table.getTags().split(",")).contains("단체"));
+        if (party <= 2 && bigSeat) throw new IllegalStateException("단체석은 3명 이상부터 이용할 수 있어요");
+        Zone z = table.getZone();
+        if (z != null && z.getMinParty() != null && party < z.getMinParty())
+            throw new IllegalStateException(z.getName() + "은 " + z.getMinParty() + "명 이상만 받아요");
+        if (z != null && z.getMaxParty() != null && party > z.getMaxParty())
+            throw new IllegalStateException(z.getName() + "은 " + z.getMaxParty() + "명까지만 받아요");
     }
 
     /** 손님 취소: 확정 상태이고 방문 시각 전일 때만 */
