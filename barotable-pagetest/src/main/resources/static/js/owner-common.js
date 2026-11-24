@@ -41,6 +41,16 @@
     <div class="side-bottom"><a data-go="index" href="${BT.url('index')}">${icon('eye')}<span>손님 화면 보기</span></a>
       <a data-go="owner-login" href="${BT.url('owner-login')}">${icon('logout')}<span>로그아웃</span></a></div>
     <div class="side-who">매장 관리자</div>`;
+  side.querySelector('a[data-go="owner-login"]').addEventListener('click', async e => {
+    if (!window.API?.on) return;
+    e.preventDefault();
+    try {
+      await API.post('/api/staff/logout');
+      BT.go('owner-login');
+    } catch (err) {
+      BT.toast(err.message);
+    }
+  });
   // Quick links are real in-page anchors. Keep them within the embedded document.
   side.querySelectorAll('.side-shortcut').forEach(a => a.addEventListener('click', e => {
     const target=document.getElementById(a.getAttribute('href').slice(1));
