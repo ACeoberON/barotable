@@ -44,7 +44,7 @@
     if (!$('#c-agree').checked) return fail($('#c-agree'), '개인정보 수집·이용 동의가 필요합니다.');
     const request = $('#c-req').value.trim();
     /* 이미 확정한 예약을 새로고침 · 뒤로가기로 다시 보낸 경우: 새로 만들지 않고 완료 화면으로 */
-    if (d.confirmed && d.no && BT.reservations().some(r => r.no === d.no)) { BT.go('complete'); return; }
+    if (d.confirmed && d.no) { BT.go('complete'); return; }
     if (!picked) {
       error.hidden = false;
       error.innerHTML = `좌석을 먼저 골라 주세요. <a href="${BT.url('reserve')}">좌석 고르기</a>`;
